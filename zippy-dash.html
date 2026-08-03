@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zippy Dash — Flowgames</title>
+<!-- Verify this is the current SDK URL in the CrazyGames Developer Portal before submission -->
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: radial-gradient(ellipse at top, #1e3a8a 0%, #0c1230 70%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  #wrap {
+    position: relative;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  canvas {
+    background: #1a1a2e;
+    border: 4px solid #facc15;
+    border-radius: 16px;
+    box-shadow: 0 0 40px rgba(250, 204, 21, 0.5);
+    touch-action: none;
+  }
+  #hud {
+    position: absolute;
+    top: 18px;
+    left: 22px;
+    color: #422006;
+    font-size: 20px;
+    font-weight: 900;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+  }
+  #best {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    color: #78350f;
+    font-size: 14px;
+    font-weight: bold;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+  }
+  #combo {
+    position: absolute;
+    top: 44px;
+    left: 22px;
+    color: #dc2626;
+    font-size: 14px;
+    font-weight: 900;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    transition: transform 0.15s;
+  }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background: rgba(12, 18, 48, 0.9);
+    border-radius: 16px;
+  }
+  #logo {
+    font-size: 40px;
+    font-weight: 900;
+    color: #facc15;
+    text-shadow: 0 0 20px rgba(250,204,21,0.6), 0 2px 0 #78350f;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  #brand {
+    font-size: 13px;
+    color: #93c5fd;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    font-weight: 600;
+  }
+  #overlay p {
+    margin: 0 0 18px;
+    color: #cbd5e1;
+    font-size: 13px;
+    max-width: 280px;
+  }
+  button {
+    padding: 13px 34px;
+    font-size: 16px;
+    font-weight: 900;
+    background: #facc15;
+    color: #422006;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #b45309;
+    transition: transform 0.08s;
+  }
+  button:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 #b45309;
+  }
+  #charGrid {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 340px;
+  }
+  .charCard {
+    width: 78px;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 8px 4px 6px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s, background 0.15s;
+  }
+  .charCard:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.1);
+  }
+  .charCard.selected {
+    border-color: #facc15;
+    background: rgba(250,204,21,0.12);
+  }
+  .charCard canvas {
+    width: 100%;
+    height: 68px;
+    display: block;
+  }
+  .charCard .cname {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #e2e8f0;
+    margin-top: 4px;
+    letter-spacing: 0.3px;
+  }
+  #ctrlRow {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .ctrlBtn {
+    background: rgba(0,0,0,0.35);
+    color: #facc15;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: none;
+  }
+  .ctrlBtn:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  #pauseOverlayBox {
+    text-align: center;
+  }
+  #footer {
+    margin-top: 10px;
+    color: #475569;
+    font-size: 12px;
+  }
+  @keyframes gameOverPop {
+    0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+    55%  { transform: scale(1.18) rotate(3deg); opacity: 1; }
+    75%  { transform: scale(0.96) rotate(-1deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .gameOverPop {
+    animation: gameOverPop 0.5s cubic-bezier(.34,1.56,.64,1);
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="hud">0</div>
+  <div id="combo"></div>
+  <div id="best">Best: 0</div>
+  <canvas id="game" width="420" height="640"></canvas>
+  <div id="ctrlRow">
+    <button id="pauseBtn" class="ctrlBtn" disabled>⏸️</button>
+    <button id="musicBtn" class="ctrlBtn">🎵</button>
+    <button id="muteBtn" class="ctrlBtn">🔊</button>
+  </div>
+  <audio id="bgMusic" loop preload="auto">
+    <source src="bg-music.mp3" type="audio/mpeg">
+  </audio>
+  <div id="overlay">
+    <div id="logo">ZIPPY DASH</div>
+    <div id="brand">Flowgames</div>
+    <p>Pick your dasher, then dodge the crates! ← → or A/D, or tap left/right on mobile.</p>
+    <div id="charGrid"></div>
+    <button id="startBtn">Start Game</button>
+  </div>
+</div>
+<div id="footer">Zippy Dash · Flowgames</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const hud = document.getElementById('hud');
+const bestEl = document.getElementById('best');
+const comboEl = document.getElementById('combo');
+const overlay = document.getElementById('overlay');
+const startBtn = document.getElementById('startBtn');
+const muteBtn = document.getElementById('muteBtn');
+const musicBtn = document.getElementById('musicBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const bgMusic = document.getElementById('bgMusic');
+bgMusic.volume = 0.35;
+let musicMuted = false;
+let gameActive = false;
+let isPaused = false;
+bgMusic.load();
+
+// Logical game coordinate space -- all game logic/drawing uses these, unchanged
+// regardless of actual screen size or pixel density.
+const W = 420, H = 640;
+const LANES = 4;
+const laneWidth = W / LANES;
+
+// High-DPI backing buffer so the game stays crisp on retina/high-density screens
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width = W * dpr;
+canvas.height = H * dpr;
+ctx.scale(dpr, dpr);
+
+// Responsive display sizing -- fits the canvas into whatever viewport/iframe
+// CrazyGames gives it (required: readable across their listed iframe sizes),
+// while keeping the game's aspect ratio intact.
+function fitCanvasToViewport() {
+  const reservedHeight = 100; // space for control buttons + footer below the canvas
+  const maxW = window.innerWidth * 0.94;
+  const maxH = (window.innerHeight - reservedHeight) * 0.94;
+  const scale = Math.max(Math.min(maxW / W, maxH / H, 1.5), 0.35);
+  canvas.style.width = Math.round(W * scale) + 'px';
+  canvas.style.height = Math.round(H * scale) + 'px';
+}
+window.addEventListener('resize', fitCanvasToViewport);
+fitCanvasToViewport();
+
+let player, obstacles, items, itemSpawnTimer, particles, score, best, speed, running, spawnTimer, animId, muted = false;
+let dying = false, deathTimer = 0, shakeIntensity = 0, flashAlpha = 0;
+let combo = 0, comboMultiplier = 1, comboPopups = [];
+let sdkReady = false;
+
+// ---------- CrazyGames SDK (safe wrapper — works even if SDK fails to load, e.g. local testing) ----------
+const CG = window.CrazyGames && window.CrazyGames.SDK ? window.CrazyGames.SDK : null;
+
+// ---------- CrazyGames Leaderboard (invite-only feature) ----------
+// NOTE: The leaderboard feature must first be enabled for this game in the
+// CrazyGames Developer Portal, which will provide a real 32-byte base64
+// encryption key. Replace the placeholder below with that real key before
+// submission -- until then, submission is safely skipped (see the check
+// inside submitLeaderboardScore).
+const LEADERBOARD_ENCRYPTION_KEY = 'REPLACE_WITH_KEY_FROM_DEVELOPER_PORTAL';
+
+async function encryptScore(score, encryptionKey) {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const algorithm = { name: 'AES-GCM', iv: iv };
+  const keyBytes = new Uint8Array(
+    atob(encryptionKey).split('').map(c => c.charCodeAt(0))
+  );
+  const cryptoKey = await window.crypto.subtle.importKey('raw', keyBytes, algorithm, false, ['encrypt']);
+  const dataBuffer = new TextEncoder().encode(score.toString());
+  const encryptedBuffer = await window.crypto.subtle.encrypt(algorithm, cryptoKey, dataBuffer);
+  const combined = new Uint8Array(iv.length + encryptedBuffer.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(encryptedBuffer), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function submitLeaderboardScore(finalScore) {
+  if (!CG || !CG.user || typeof CG.user.submitScore !== 'function') return;
+  if (LEADERBOARD_ENCRYPTION_KEY === 'REPLACE_WITH_KEY_FROM_DEVELOPER_PORTAL') return; // not configured yet
+  try {
+    const encryptedScore = await encryptScore(finalScore, LEADERBOARD_ENCRYPTION_KEY);
+    CG.user.submitScore({ encryptedScore, score: finalScore });
+  } catch (e) {
+    console.log('Leaderboard submission failed', e);
+  }
+}
+
+async function initSDK() {
+  if (!CG) return; // running outside CrazyGames (e.g. local file testing) — skip silently
+  try {
+    if (CG.game) CG.game.loadingStart();
+    await CG.init();
+    sdkReady = true;
+  } catch (e) {
+    console.log('CrazyGames SDK init failed', e);
+  }
+}
+// Kick off init immediately; loadingStop() is called once the title screen is interactive.
+const sdkInitPromise = initSDK();
+
+// ---------- Sound (WebAudio, no external assets) ----------
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function beep(freq, duration, type = 'sine', vol = 0.15) {
+  if (muted) return;
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+// Softer, more pleasant tone helpers (used for the redesigned SFX below)
+function playTone(freq, duration, type, vol, startTime) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  gain.gain.setValueAtTime(vol, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+function sweepTone(freqStart, freqEnd, duration, type, vol) {
+  if (muted) return;
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freqStart, now);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(freqEnd, 1), now + duration);
+  gain.gain.setValueAtTime(vol, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration);
+}
+
+// Softer lane-switch "boop" (gentle upward sine sweep instead of a harsh square beep)
+function sfxMove()  { sweepTone(440, 640, 0.09, 'sine', 0.10); }
+// Bright two-note ascending chime for scoring
+function sfxScore() {
+  if (muted) return;
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  playTone(660, 0.10, 'triangle', 0.08, now);
+  playTone(880, 0.14, 'triangle', 0.08, now + 0.08);
+}
+// Gentle descending "womp" for game over (triangle wave instead of harsh sawtooth)
+function sfxHit()   { sweepTone(320, 110, 0.4, 'triangle', 0.16); }
+// Quick bright chirp for collecting an item
+function sfxCollect() { sweepTone(700, 1000, 0.12, 'sine', 0.09); }
+// Bright three-note ascending arpeggio for combo level-ups
+function sfxCombo() {
+  if (muted) return;
+  ensureAudio();
+  const now = audioCtx.currentTime;
+  playTone(523, 0.10, 'triangle', 0.09, now);
+  playTone(659, 0.10, 'triangle', 0.09, now + 0.07);
+  playTone(784, 0.16, 'triangle', 0.10, now + 0.14);
+}
+
+function safePlayMusic() {
+  try {
+    const p = bgMusic.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) {
+    console.log('Music play failed (non-fatal):', e);
+  }
+}
+function attemptPlayMusic() {
+  if (musicMuted) return;
+  safePlayMusic();
+}
+// Browsers require a user gesture before audio can play with sound.
+// This lets music start on the very first click/tap anywhere on the page,
+// so it's already playing under the title screen, not just after Start Game.
+document.addEventListener('pointerdown', attemptPlayMusic);
+document.addEventListener('keydown', attemptPlayMusic);
+
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+});
+
+musicBtn.addEventListener('click', () => {
+  musicMuted = !musicMuted;
+  musicBtn.textContent = musicMuted ? '🔕' : '🎵';
+  musicBtn.style.opacity = musicMuted ? '0.5' : '1';
+  if (musicMuted) {
+    bgMusic.pause();
+  } else if (gameActive && !isPaused) {
+    safePlayMusic();
+  }
+});
+
+function togglePause() {
+  if (!gameActive) return; // only meaningful during active gameplay
+  isPaused = !isPaused;
+  if (isPaused) {
+    running = false;
+    cancelAnimationFrame(animId);
+    if (CG && CG.game) CG.game.gameplayStop();
+    bgMusic.pause();
+    pauseBtn.textContent = '▶️';
+    overlay.innerHTML = `
+      <div id="pauseOverlayBox">
+        <div id="logo" style="font-size:34px;">PAUSED</div>
+        <div id="brand">Zippy Dash · Flowgames</div>
+        <button id="resumeBtn">Resume</button>
+      </div>
+    `;
+    overlay.style.display = 'flex';
+    document.getElementById('resumeBtn').addEventListener('click', togglePause);
+  } else {
+    overlay.style.display = 'none';
+    overlay.innerHTML = '';
+    pauseBtn.textContent = '⏸️';
+    running = true;
+    lastFrameTime = 0;
+    if (CG && CG.game) CG.game.gameplayStart();
+    if (!musicMuted) safePlayMusic();
+    loop();
+  }
+}
+pauseBtn.addEventListener('click', togglePause);
+
+// ---------- Persistence (CrazyGames Data module, falls back locally if SDK unavailable) ----------
+function loadBest() {
+  try {
+    if (CG && CG.data) {
+      const stored = CG.data.getItem('zippyDashBest');
+      return parseInt(stored || '0', 10) || 0;
+    }
+  } catch (e) { /* fall through to local fallback */ }
+  return parseInt(window.__zippyDashBestFallback || '0', 10) || 0;
+}
+function saveBest(val) {
+  try {
+    if (CG && CG.data) {
+      CG.data.setItem('zippyDashBest', String(val));
+      return;
+    }
+  } catch (e) { /* fall through to local fallback */ }
+  window.__zippyDashBestFallback = String(val);
+}
+best = 0; // populated once SDK init resolves (Data module requires init first)
+
+function resetGame() {
+  dying = false;
+  deathTimer = 0;
+  shakeIntensity = 0;
+  flashAlpha = 0;
+  combo = 0;
+  comboMultiplier = 1;
+  comboPopups = [];
+  comboEl.textContent = '';
+  player = {
+    lane: 1,
+    x: laneWidth * 1 + laneWidth / 2,
+    y: H - 90,
+    w: 42,
+    h: 52,
+    targetX: laneWidth * 1 + laneWidth / 2,
+    bob: 0
+  };
+  obstacles = [];
+  items = [];
+  itemSpawnTimer = 0;
+  particles = [];
+  score = 0;
+  speed = 4.2;
+  spawnTimer = 0;
+  running = true;
+  hud.textContent = '0';
+}
+
+function spawnObstacle() {
+  const lane = Math.floor(Math.random() * LANES);
+  obstacles.push({
+    lane,
+    x: laneWidth * lane + laneWidth / 2,
+    y: -50,
+    w: 44,
+    h: 44,
+    rot: 0
+  });
+}
+
+function spawnItem() {
+  const lane = Math.floor(Math.random() * LANES);
+  items.push({
+    lane,
+    x: laneWidth * lane + laneWidth / 2,
+    y: -40,
+    w: 30,
+    h: 30,
+    rot: 0
+  });
+}
+
+function movePlayerTo(lane) {
+  lane = Math.max(0, Math.min(LANES - 1, lane));
+  if (lane !== player.lane) sfxMove();
+  player.lane = lane;
+  player.targetX = laneWidth * lane + laneWidth / 2;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!running || dying) return;
+  // Using e.code (physical key position) rather than e.key so that AZERTY
+  // users' ZQSD keys — which sit in the same physical spot as WASD — work correctly.
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') movePlayerTo(player.lane - 1);
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') movePlayerTo(player.lane + 1);
+});
+
+// iOS suspends the AudioContext when the app is backgrounded/interrupted; it must be
+// resumed from within a direct user gesture (touchend), per CrazyGames' documented fix.
+document.addEventListener('touchend', () => {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+});
+
+canvas.addEventListener('pointerdown', (e) => {
+  ensureAudio();
+  if (!running || dying) return;
+  const rect = canvas.getBoundingClientRect();
+  // Normalize to logical game coordinates -- displayed size can now differ
+  // from the logical W/H since the canvas is responsively scaled.
+  const x = (e.clientX - rect.left) / rect.width * W;
+  if (x < W / 2) movePlayerTo(player.lane - 1);
+  else movePlayerTo(player.lane + 1);
+});
+
+function collectItem(it) {
+  score += ITEM_POINTS;
+  hud.textContent = String(score);
+  sfxCollect();
+  const species = CHARACTERS[selectedCharIndex].species;
+  spawnParticles(it.x, it.y, ITEM_COLORS[species] || '#fbbf24', 10, 1.3, 26);
+  comboPopups.push({
+    x: it.x,
+    y: it.y - 20,
+    life: 40,
+    text: '+' + ITEM_POINTS
+  });
+}
+
+function triggerComboPopup(multiplier) {
+  comboPopups.push({
+    x: player.x,
+    y: player.y - 45,
+    life: 55,
+    text: 'COMBO x' + multiplier.toFixed(1).replace('.0', '') + '!'
+  });
+}
+
+function spawnParticles(x, y, color, count = 12, speedMult = 1, life = 30) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6 * speedMult,
+      vy: (Math.random() - 0.5) * 6 * speedMult - 2,
+      life,
+      color
+    });
+  }
+}
+
+function update(dt) {
+  // Death sequence: freeze normal gameplay, let shake/flash/particles play out,
+  // then hand off to the full game-over screen for a more dramatic beat.
+  if (dying) {
+    deathTimer -= dt;
+    shakeIntensity *= Math.pow(0.90, dt);
+    flashAlpha *= Math.pow(0.85, dt);
+
+    // Mario-style pop: rise, spin, then gravity pulls it down off screen
+    player.deathVY += 0.55 * dt;
+    player.deathY += player.deathVY * dt;
+    player.deathRot += 16 * dt;
+
+    particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+    particles = particles.filter(p => p.life > 0);
+    if (deathTimer <= 0) {
+      dying = false;
+      finalizeGameOver();
+    }
+    return;
+  }
+
+  player.x += (player.targetX - player.x) * Math.min(0.28 * dt, 1);
+  player.bob += 0.25 * dt;
+
+  spawnTimer += dt;
+  const spawnRate = Math.max(26, 55 - Math.floor(score / 4));
+  if (spawnTimer > spawnRate) {
+    spawnObstacle();
+    spawnTimer = 0;
+  }
+
+  for (let o of obstacles) {
+    o.y += speed * dt;
+    o.rot += 0.05 * dt;
+  }
+
+  for (let o of obstacles) {
+    if (o.lane === player.lane) {
+      const overlapY = o.y + o.h > player.y - player.h / 2 && o.y < player.y + player.h / 2;
+      if (overlapY) return triggerDeathSequence();
+    }
+  }
+
+  // Collectible items -- themed to the selected character's world, bonus
+  // points on top of the survival/combo score, no penalty for missing them.
+  itemSpawnTimer += dt;
+  if (itemSpawnTimer > 110) {
+    spawnItem();
+    itemSpawnTimer = 0;
+  }
+  for (let it of items) {
+    it.y += speed * dt;
+    it.rot += 0.04 * dt;
+  }
+  items = items.filter(it => {
+    if (it.lane === player.lane) {
+      const overlapY = it.y + it.h > player.y - player.h / 2 && it.y < player.y + player.h / 2;
+      if (overlapY) {
+        collectItem(it);
+        return false;
+      }
+    }
+    return it.y < H + 60;
+  });
+
+  const before = obstacles.length;
+  obstacles = obstacles.filter(o => o.y < H + 60);
+  const passed = before - obstacles.length;
+  if (passed > 0) {
+    combo += passed;
+    const newMultiplier = Math.min(1 + Math.floor(combo / 10) * 0.5, 5);
+    const leveledUp = newMultiplier > comboMultiplier;
+    comboMultiplier = newMultiplier;
+
+    const pointsEarned = Math.round(passed * comboMultiplier);
+    score += pointsEarned;
+    hud.textContent = String(score);
+    if (comboMultiplier > 1) {
+      comboEl.textContent = 'x' + comboMultiplier.toFixed(1).replace('.0', '') + ' combo';
+    }
+    speed = 4.2 + score * 0.07;
+    sfxScore();
+    spawnParticles(player.x, player.y, '#facc15');
+
+    if (leveledUp) {
+      triggerComboPopup(comboMultiplier);
+      sfxCombo();
+    }
+  }
+
+  comboPopups.forEach(p => { p.y -= 1.2 * dt; p.life -= dt; });
+  comboPopups = comboPopups.filter(p => p.life > 0);
+
+  particles.forEach(p => {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt;
+  });
+  particles = particles.filter(p => p.life > 0);
+}
+
+function triggerDeathSequence() {
+  dying = true;
+  deathTimer = 120; // ~2 seconds at 60fps before the game-over screen appears
+  shakeIntensity = 16;
+  flashAlpha = 1;
+  spawnParticles(player.x, player.y, '#ffffff', 14, 1.8, 40);
+  spawnParticles(player.x, player.y, '#ef4444', 16, 2.2, 45);
+  sfxHit();
+
+  // Mario-style death pop: toss the character upward with spin, then let
+  // gravity pull it back down and off the bottom of the screen.
+  player.deathY = player.y;
+  player.deathVY = -11;
+  player.deathRot = 0;
+}
+
+// ---------- Characters (original cute animal designs) ----------
+const CHARACTERS = [
+  { id: 'zippy', name: 'Zippy', species: 'fox', body: '#fb923c', bodyStroke: '#c2410c', belly: '#fff7ed' },
+  { id: 'blaze', name: 'Blaze', species: 'bunny', body: '#f9a8d4', bodyStroke: '#be185d', belly: '#fff1f5' },
+  { id: 'pip', name: 'Pip', species: 'panda', body: '#f8fafc', bodyStroke: '#1f2937', belly: '#f8fafc' },
+  { id: 'nova', name: 'Nova', species: 'cat', body: '#a78bfa', bodyStroke: '#5b21b6', belly: '#ede9fe' },
+  { id: 'coral', name: 'Coral', species: 'duck', body: '#fde047', bodyStroke: '#ca8a04', belly: '#fffbeb' }
+];
+let selectedCharIndex = 0;
+
+function drawTail(c, species, color, stroke) {
+  c.fillStyle = color;
+  c.strokeStyle = stroke;
+  c.lineWidth = 2;
+  if (species === 'fox') {
+    c.beginPath();
+    c.moveTo(18, 10);
+    c.quadraticCurveTo(40, 4, 34, 26);
+    c.quadraticCurveTo(30, 36, 17, 28);
+    c.closePath();
+    c.fill(); c.stroke();
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.ellipse(30, 23, 6, 8, 0.5, 0, Math.PI * 2); c.fill();
+  } else if (species === 'cat') {
+    c.lineCap = 'round';
+    c.lineWidth = 7;
+    c.strokeStyle = color;
+    c.beginPath();
+    c.moveTo(16, 14);
+    c.quadraticCurveTo(36, 18, 30, 0);
+    c.stroke();
+  } else if (species === 'bunny') {
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(16, 22, 7, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#e5e7eb'; c.lineWidth = 1.5; c.stroke();
+  } else if (species === 'duck') {
+    c.beginPath();
+    c.moveTo(16, 14); c.lineTo(32, 6); c.lineTo(26, 20);
+    c.closePath();
+    c.fill(); c.stroke();
+  }
+  // panda: no visible tail
+}
+
+function drawEars(c, species, color, stroke) {
+  c.fillStyle = color;
+  c.strokeStyle = stroke;
+  c.lineWidth = 2;
+  if (species === 'fox') {
+    c.beginPath(); c.moveTo(-18, -14); c.lineTo(-27, -40); c.lineTo(-8, -20); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(18, -14); c.lineTo(27, -40); c.lineTo(8, -20); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fecdd3';
+    c.beginPath(); c.moveTo(-17, -18); c.lineTo(-22, -33); c.lineTo(-12, -21); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(17, -18); c.lineTo(22, -33); c.lineTo(12, -21); c.closePath(); c.fill();
+  } else if (species === 'bunny') {
+    c.save(); c.translate(-10, -22); c.rotate(-0.18);
+    c.beginPath(); c.ellipse(0, -18, 7, 23, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = '#fecdd3';
+    c.beginPath(); c.ellipse(0, -18, 3.3, 17, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.save(); c.translate(10, -22); c.rotate(0.18);
+    c.fillStyle = color;
+    c.beginPath(); c.ellipse(0, -18, 7, 23, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.fillStyle = '#fecdd3';
+    c.beginPath(); c.ellipse(0, -18, 3.3, 17, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+  } else if (species === 'panda') {
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.arc(-16, -22, 10, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(16, -22, 10, 0, Math.PI * 2); c.fill();
+  } else if (species === 'cat') {
+    c.beginPath(); c.moveTo(-16, -16); c.lineTo(-23, -37); c.lineTo(-6, -22); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(16, -16); c.lineTo(23, -37); c.lineTo(6, -22); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#fecdd3';
+    c.beginPath(); c.moveTo(-15, -19); c.lineTo(-19, -31); c.lineTo(-10, -22); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(15, -19); c.lineTo(19, -31); c.lineTo(10, -22); c.closePath(); c.fill();
+  } else if (species === 'duck') {
+    c.strokeStyle = stroke; c.lineWidth = 2.5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-4, -30); c.lineTo(-8, -41); c.stroke();
+    c.beginPath(); c.moveTo(4, -30); c.lineTo(8, -41); c.stroke();
+  }
+}
+
+function drawFace(c, species) {
+  // eyes
+  if (species === 'panda') {
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.ellipse(-9, -6, 6, 7, 0.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(9, -6, 6, 7, -0.2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#f8fafc';
+    c.beginPath(); c.arc(-9, -6, 2.6, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(9, -6, 2.6, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.arc(-9, -5, 1.3, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(9, -5, 1.3, 0, Math.PI * 2); c.fill();
+  } else {
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.arc(-8, -8, 3, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(8, -8, 3, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(-7, -9, 1, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(9, -9, 1, 0, Math.PI * 2); c.fill();
+  }
+
+  // snout / beak / nose
+  if (species === 'duck') {
+    c.fillStyle = '#fb923c';
+    c.beginPath(); c.ellipse(0, 2, 11, 6, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#c2410c'; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.moveTo(-11, 2); c.lineTo(11, 2); c.stroke();
+  } else if (species === 'fox') {
+    c.fillStyle = '#fff7ed';
+    c.beginPath(); c.ellipse(0, 2, 9, 7, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.ellipse(0, 3, 3, 2.2, 0, 0, Math.PI * 2); c.fill();
+  } else if (species === 'bunny') {
+    c.fillStyle = '#fda4af';
+    c.beginPath(); c.moveTo(-3, 0); c.lineTo(3, 0); c.lineTo(0, 4); c.closePath(); c.fill();
+  } else if (species === 'panda') {
+    c.fillStyle = '#1f2937';
+    c.beginPath(); c.ellipse(0, 3, 3.5, 2.5, 0, 0, Math.PI * 2); c.fill();
+  } else if (species === 'cat') {
+    c.fillStyle = '#fda4af';
+    c.beginPath(); c.moveTo(-3, 0); c.lineTo(3, 0); c.lineTo(0, 3); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(-10, 2); c.lineTo(-20, 0); c.moveTo(-10, 5); c.lineTo(-20, 6); c.stroke();
+    c.beginPath(); c.moveTo(10, 2); c.lineTo(20, 0); c.moveTo(10, 5); c.lineTo(20, 6); c.stroke();
+  }
+
+  // blush cheeks
+  c.fillStyle = 'rgba(248,113,113,0.35)';
+  c.beginPath(); c.ellipse(-14, 4, 4, 3, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(14, 4, 4, 3, 0, 0, Math.PI * 2); c.fill();
+}
+
+function drawCharacter(c, x, y, bobOffset, charDef, rotationDeg = 0) {
+  const bob = Math.sin(bobOffset) * 3;
+  c.save();
+  c.translate(x, y + bob);
+  if (rotationDeg) c.rotate(rotationDeg * Math.PI / 180);
+
+  drawTail(c, charDef.species, charDef.body, charDef.bodyStroke);
+
+  // body (single rounded chibi blob)
+  c.fillStyle = charDef.body;
+  c.strokeStyle = charDef.bodyStroke;
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.ellipse(0, 2, 22, 28, 0, 0, Math.PI * 2);
+  c.fill();
+  c.stroke();
+
+  drawEars(c, charDef.species, charDef.body, charDef.bodyStroke);
+
+  // belly patch
+  c.fillStyle = charDef.belly;
+  c.beginPath();
+  c.ellipse(0, 14, 12, 14, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // paws
+  c.fillStyle = charDef.body;
+  c.strokeStyle = charDef.bodyStroke;
+  c.lineWidth = 1.5;
+  c.beginPath(); c.ellipse(-20, 14 + Math.sin(bobOffset * 2) * 2, 6, 8, 0.3, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.beginPath(); c.ellipse(20, 14 - Math.sin(bobOffset * 2) * 2, 6, 8, -0.3, 0, Math.PI * 2); c.fill(); c.stroke();
+
+  drawFace(c, charDef.species);
+
+  c.restore();
+}
+
+// ---------- Character select UI ----------
+function buildCharGrid(container) {
+  container.innerHTML = '';
+  CHARACTERS.forEach((char, idx) => {
+    const card = document.createElement('div');
+    card.className = 'charCard' + (idx === selectedCharIndex ? ' selected' : '');
+    const miniCanvas = document.createElement('canvas');
+    miniCanvas.width = 78;
+    miniCanvas.height = 68;
+    const mctx = miniCanvas.getContext('2d');
+    drawSceneThumbnail(mctx, char.species, 78, 68);
+    drawCharacter(mctx, 39, 42, 0, char);
+    const label = document.createElement('div');
+    label.className = 'cname';
+    label.textContent = char.name;
+    card.appendChild(miniCanvas);
+    card.appendChild(label);
+    card.addEventListener('click', () => {
+      selectedCharIndex = idx;
+      sweepTone(700, 900, 0.07, 'sine', 0.09);
+      container.querySelectorAll('.charCard').forEach(el => el.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    container.appendChild(card);
+  });
+}
+
+// ---------- Per-character themed backgrounds ----------
+function getTheme(species) {
+  switch (species) {
+    case 'fox':
+      return { sky: [[0, '#fde68a'], [35, '#fb923c'], [100, '#7c2d12']], decor: 'forest' };
+    case 'bunny':
+      return { sky: [[0, '#bbf7d0'], [40, '#86efac'], [100, '#166534']], decor: 'carrot' };
+    case 'panda':
+      return { sky: [[0, '#d9f99d'], [40, '#84cc16'], [100, '#365314']], decor: 'bamboo' };
+    case 'cat':
+      return { sky: [[0, '#312e81'], [45, '#6d28d9'], [100, '#1e1b4b']], decor: 'yarn' };
+    case 'duck':
+      return { sky: [[0, '#bae6fd'], [40, '#38bdf8'], [100, '#075985']], decor: 'pond' };
+    default:
+      return { sky: [[0, '#fde68a'], [35, '#fbbf24'], [100, '#78350f']], decor: 'forest' };
+  }
+}
+
+function drawTreeSilhouette(c, x, H) {
+  c.fillStyle = 'rgba(69,26,3,0.4)';
+  c.beginPath();
+  c.moveTo(x, H - 170);
+  c.lineTo(x - 26, H - 40);
+  c.lineTo(x + 26, H - 40);
+  c.closePath();
+  c.fill();
+  c.fillRect(x - 5, H - 45, 10, 45);
+}
+
+function drawFallingLeaves(c, W, H) {
+  c.fillStyle = 'rgba(234,88,12,0.45)';
+  const positions = [[60, 120], [340, 220], [110, 420], [300, 520], [200, 80]];
+  positions.forEach(([lx, ly]) => {
+    c.beginPath();
+    c.ellipse(lx, ly, 6, 4, 0.6, 0, Math.PI * 2);
+    c.fill();
+  });
+}
+
+function drawCarrotRow(c, W, H) {
+  const y = H - 24;
+  for (let x = 30; x < W; x += 55) {
+    c.fillStyle = '#fb923c';
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(x - 8, y + 24);
+    c.lineTo(x + 8, y + 24);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#166534';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(x - 4, y - 12);
+    c.moveTo(x, y);
+    c.lineTo(x + 4, y - 12);
+    c.stroke();
+  }
+}
+
+function drawBambooStalk(c, x, H) {
+  c.fillStyle = '#65a30d';
+  c.fillRect(x - 9, 0, 18, H);
+  c.strokeStyle = '#365314';
+  c.lineWidth = 2.5;
+  for (let y = 40; y < H; y += 65) {
+    c.beginPath();
+    c.moveTo(x - 9, y);
+    c.lineTo(x + 9, y);
+    c.stroke();
+  }
+}
+
+function drawMoon(c, x, y) {
+  c.fillStyle = '#fef9c3';
+  c.beginPath();
+  c.arc(x, y, 26, 0, Math.PI * 2);
+  c.fill();
+}
+
+function drawYarnBall(c, x, y, color) {
+  c.fillStyle = color;
+  c.beginPath();
+  c.arc(x, y, 16, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.5)';
+  c.lineWidth = 1.5;
+  c.beginPath(); c.arc(x, y, 10, 0, Math.PI * 1.5); c.stroke();
+  c.beginPath(); c.arc(x, y, 13, 0.4, Math.PI * 1.8); c.stroke();
+}
+
+function drawLilyPad(c, x, y) {
+  c.fillStyle = '#22c55e';
+  c.beginPath();
+  c.arc(x, y, 18, 0.3, Math.PI * 1.9);
+  c.lineTo(x, y);
+  c.closePath();
+  c.fill();
+}
+
+function drawReeds(c, x, H) {
+  c.strokeStyle = '#166534';
+  c.lineWidth = 3;
+  c.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const rx = x + (i - 1) * 6;
+    c.beginPath();
+    c.moveTo(rx, H);
+    c.lineTo(rx + (i - 1) * 8, H - 70);
+    c.stroke();
+  }
+}
+
+function drawSceneThumbnail(c, species, w, h) {
+  const theme = getTheme(species);
+  const grad = c.createLinearGradient(0, 0, 0, h);
+  theme.sky.forEach(([pct, color]) => grad.addColorStop(pct / 100, color));
+  c.fillStyle = grad;
+  c.fillRect(0, 0, w, h);
+}
+
+function drawScene(c, species, W, H) {
+  const theme = getTheme(species);
+  const grad = c.createLinearGradient(0, 0, 0, H);
+  theme.sky.forEach(([pct, color]) => grad.addColorStop(pct / 100, color));
+  c.fillStyle = grad;
+  c.fillRect(0, 0, W, H);
+
+  if (theme.decor === 'forest') {
+    drawTreeSilhouette(c, 20, H);
+    drawTreeSilhouette(c, W - 20, H);
+    drawFallingLeaves(c, W, H);
+  } else if (theme.decor === 'carrot') {
+    drawCarrotRow(c, W, H);
+  } else if (theme.decor === 'bamboo') {
+    drawBambooStalk(c, 18, H);
+    drawBambooStalk(c, W - 18, H);
+  } else if (theme.decor === 'yarn') {
+    drawMoon(c, W - 60, 70);
+    drawYarnBall(c, 30, H - 60, '#f472b6');
+    drawYarnBall(c, W - 35, H - 100, '#60a5fa');
+  } else if (theme.decor === 'pond') {
+    drawLilyPad(c, 25, H - 40);
+    drawLilyPad(c, W - 30, H - 70);
+    drawReeds(c, 10, H);
+    drawReeds(c, W - 12, H);
+  }
+}
+
+// ---------- Per-character themed obstacles ----------
+function drawRockObstacle(c, size) {
+  const r = size / 2;
+  c.fillStyle = '#78716c';
+  c.strokeStyle = '#44403c';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.moveTo(-r, r * 0.3);
+  c.lineTo(-r * 0.5, -r);
+  c.lineTo(r * 0.4, -r * 0.8);
+  c.lineTo(r, r * 0.1);
+  c.lineTo(r * 0.6, r);
+  c.lineTo(-r * 0.4, r * 0.9);
+  c.closePath();
+  c.fill();
+  c.stroke();
+  c.strokeStyle = 'rgba(68,64,60,0.6)';
+  c.lineWidth = 1.5;
+  c.beginPath(); c.moveTo(-r * 0.2, -r * 0.3); c.lineTo(r * 0.1, r * 0.4); c.stroke();
+}
+
+function pathRoundRect(c, x, y, w, h, r) {
+  if (typeof r === 'number') r = [r, r, r, r];
+  const [r1, r2, r3, r4] = r;
+  c.moveTo(x + r1, y);
+  c.lineTo(x + w - r2, y);
+  c.arcTo(x + w, y, x + w, y + r2, r2);
+  c.lineTo(x + w, y + h - r3);
+  c.arcTo(x + w, y + h, x + w - r3, y + h, r3);
+  c.lineTo(x + r4, y + h);
+  c.arcTo(x, y + h, x, y + h - r4, r4);
+  c.lineTo(x, y + r1);
+  c.arcTo(x, y, x + r1, y, r1);
+  c.closePath();
+}
+
+function drawHayBaleObstacle(c, size) {
+  const w = size, h = size * 0.8;
+  c.fillStyle = '#d97706';
+  c.strokeStyle = '#92400e';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  pathRoundRect(c, -w / 2, -h / 2, w, h, 10);
+  c.fill(); c.stroke();
+  c.strokeStyle = '#78350f';
+  c.lineWidth = 2;
+  for (let i = -1; i <= 1; i++) {
+    c.beginPath(); c.moveTo(-w / 2, i * h / 3); c.lineTo(w / 2, i * h / 3); c.stroke();
+  }
+}
+
+function drawBambooLogObstacle(c, size) {
+  const w = size, h = size * 0.6;
+  c.fillStyle = '#84cc16';
+  c.strokeStyle = '#3f6212';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  pathRoundRect(c, -w / 2, -h / 2, w, h, h / 2);
+  c.fill(); c.stroke();
+  c.strokeStyle = '#3f6212';
+  c.lineWidth = 2;
+  for (let i = -1; i <= 1; i++) {
+    c.beginPath(); c.moveTo(i * w / 3, -h / 2); c.lineTo(i * w / 3, h / 2); c.stroke();
+  }
+}
+
+function drawYarnObstacle(c, size) {
+  const r = size / 2;
+  c.fillStyle = '#f472b6';
+  c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.6)';
+  c.lineWidth = 2;
+  c.beginPath(); c.arc(0, 0, r * 0.6, 0, Math.PI * 1.5); c.stroke();
+  c.beginPath(); c.arc(0, 0, r * 0.8, 0.4, Math.PI * 1.8); c.stroke();
+  c.beginPath(); c.arc(0, 0, r * 0.4, 1, Math.PI * 2.2); c.stroke();
+}
+
+function drawMossyRockObstacle(c, size) {
+  const r = size / 2;
+  c.fillStyle = '#57534e';
+  c.strokeStyle = '#292524';
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.ellipse(0, 0, r, r * 0.8, 0, 0, Math.PI * 2);
+  c.fill(); c.stroke();
+  c.fillStyle = 'rgba(74,222,128,0.5)';
+  c.beginPath(); c.ellipse(-r * 0.2, -r * 0.2, r * 0.35, r * 0.25, 0.3, 0, Math.PI * 2); c.fill();
+}
+
+function drawCrateObstacle(c, size) {
+  const grad = c.createLinearGradient(-size / 2, -size / 2, size / 2, size / 2);
+  grad.addColorStop(0, '#a16207');
+  grad.addColorStop(1, '#78350f');
+  c.fillStyle = grad;
+  c.strokeStyle = '#451a03';
+  c.lineWidth = 2.5;
+  c.fillRect(-size / 2, -size / 2, size, size);
+  c.strokeRect(-size / 2, -size / 2, size, size);
+  c.beginPath();
+  c.moveTo(-size / 2, -size / 2); c.lineTo(size / 2, size / 2);
+  c.moveTo(size / 2, -size / 2); c.lineTo(-size / 2, size / 2);
+  c.stroke();
+}
+
+// ---------- Per-character themed collectible items ----------
+function drawAcornItem(c, size) {
+  const r = size / 2;
+  c.fillStyle = '#a16207';
+  c.beginPath(); c.ellipse(0, -r * 0.3, r * 0.6, r * 0.35, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#fbbf24';
+  c.beginPath(); c.ellipse(0, r * 0.15, r * 0.5, r * 0.6, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#78350f'; c.lineWidth = 1.5; c.stroke();
+}
+
+function drawCarrotItem(c, size) {
+  const h = size;
+  c.fillStyle = '#fb923c';
+  c.beginPath();
+  c.moveTo(0, -h * 0.35); c.lineTo(-h * 0.28, h * 0.4); c.lineTo(h * 0.28, h * 0.4);
+  c.closePath(); c.fill();
+  c.strokeStyle = '#166534'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(0, -h * 0.35); c.lineTo(-h * 0.15, -h * 0.55);
+  c.moveTo(0, -h * 0.35); c.lineTo(h * 0.15, -h * 0.55); c.stroke();
+}
+
+function drawBambooLeafItem(c, size) {
+  c.fillStyle = '#84cc16';
+  c.beginPath();
+  c.moveTo(0, -size * 0.5);
+  c.quadraticCurveTo(size * 0.35, 0, 0, size * 0.5);
+  c.quadraticCurveTo(-size * 0.35, 0, 0, -size * 0.5);
+  c.closePath(); c.fill();
+  c.strokeStyle = '#3f6212'; c.lineWidth = 1.5; c.stroke();
+}
+
+function drawFishItem(c, size) {
+  c.fillStyle = '#60a5fa';
+  c.beginPath(); c.ellipse(0, 0, size * 0.45, size * 0.28, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath();
+  c.moveTo(size * 0.4, 0); c.lineTo(size * 0.65, -size * 0.2); c.lineTo(size * 0.65, size * 0.2);
+  c.closePath(); c.fill();
+  c.fillStyle = '#1e3a8a';
+  c.beginPath(); c.arc(-size * 0.2, -size * 0.05, 2.5, 0, Math.PI * 2); c.fill();
+}
+
+function drawBreadcrumbItem(c, size) {
+  c.fillStyle = '#fbbf24';
+  c.beginPath(); c.ellipse(0, 0, size * 0.45, size * 0.35, 0.3, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#b45309'; c.lineWidth = 1.5; c.stroke();
+}
+
+function drawItem(c, x, y, size, rot, species) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(rot * 0.15);
+  switch (species) {
+    case 'fox':   drawAcornItem(c, size); break;
+    case 'bunny': drawCarrotItem(c, size); break;
+    case 'panda': drawBambooLeafItem(c, size); break;
+    case 'cat':   drawFishItem(c, size); break;
+    case 'duck':  drawBreadcrumbItem(c, size); break;
+    default:      drawAcornItem(c, size);
+  }
+  c.restore();
+}
+
+const ITEM_COLORS = { fox: '#a16207', bunny: '#fb923c', panda: '#84cc16', cat: '#60a5fa', duck: '#fbbf24' };
+const ITEM_POINTS = 8;
+
+function drawObstacle(c, x, y, size, rot, species) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(rot * 0.15);
+  switch (species) {
+    case 'fox':   drawRockObstacle(c, size); break;
+    case 'bunny': drawHayBaleObstacle(c, size); break;
+    case 'panda': drawBambooLogObstacle(c, size); break;
+    case 'cat':   drawYarnObstacle(c, size); break;
+    case 'duck':  drawMossyRockObstacle(c, size); break;
+    default:      drawCrateObstacle(c, size);
+  }
+  c.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  if (shakeIntensity > 0.3) {
+    ctx.translate((Math.random() - 0.5) * shakeIntensity, (Math.random() - 0.5) * shakeIntensity);
+  }
+
+  // themed background scene for the selected character
+  drawScene(ctx, CHARACTERS[selectedCharIndex].species, W, H);
+
+  // lane dividers (light, neutral so they read against any theme)
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 10]);
+  for (let i = 1; i < LANES; i++) {
+    ctx.beginPath();
+    ctx.moveTo(laneWidth * i, 0);
+    ctx.lineTo(laneWidth * i, H);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  for (let o of obstacles) {
+    drawObstacle(ctx, o.x, o.y, o.w, o.rot, CHARACTERS[selectedCharIndex].species);
+  }
+
+  for (let it of items) {
+    drawItem(ctx, it.x, it.y, it.w, it.rot, CHARACTERS[selectedCharIndex].species);
+  }
+
+  for (let p of particles) {
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = Math.max(p.life / 30, 0);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  for (let cp of comboPopups) {
+    ctx.globalAlpha = Math.max(cp.life / 55, 0);
+    ctx.font = '900 20px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#facc15';
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 3;
+    ctx.strokeText(cp.text, cp.x, cp.y);
+    ctx.fillText(cp.text, cp.x, cp.y);
+    ctx.globalAlpha = 1;
+  }
+
+  if (dying) {
+    drawCharacter(ctx, player.x, player.deathY, player.bob, CHARACTERS[selectedCharIndex], player.deathRot);
+  } else {
+    drawCharacter(ctx, player.x, player.y, player.bob, CHARACTERS[selectedCharIndex]);
+  }
+
+  ctx.restore();
+
+  if (flashAlpha > 0.01) {
+    ctx.fillStyle = `rgba(255,60,60,${flashAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+let lastFrameTime = 0;
+function loop(timestamp) {
+  if (!running) return;
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  const elapsedMs = timestamp - lastFrameTime;
+  lastFrameTime = timestamp;
+  // Normalize to a 60fps baseline: dt=1 at 60fps, ~0.42 at 144Hz, ~2 at 30fps.
+  // Capped to avoid huge jumps (e.g. after the tab was backgrounded).
+  const dt = Math.min(Math.max(elapsedMs / (1000 / 60), 0), 4);
+  update(dt);
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+function finalizeGameOver() {
+  running = false;
+  gameActive = false;
+  isPaused = false;
+  pauseBtn.disabled = true;
+  pauseBtn.textContent = '⏸️';
+  sfxHit();
+  cancelAnimationFrame(animId);
+  if (CG && CG.game) CG.game.gameplayStop();
+
+  if (score > best) {
+    best = score;
+    saveBest(best);
+    bestEl.textContent = 'Best: ' + best;
+  }
+
+  submitLeaderboardScore(score);
+
+  overlay.innerHTML = `
+    <div id="logo" class="gameOverPop" style="font-size:30px;">GAME OVER</div>
+    <div id="brand">Zippy Dash · Flowgames</div>
+    <p>Score: ${score} &nbsp;•&nbsp; Best: ${best}</p>
+    <div id="charGrid"></div>
+    <button id="startBtn" disabled style="opacity:0.5;cursor:default;">Loading…</button>
+  `;
+  overlay.style.display = 'flex';
+  buildCharGrid(document.getElementById('charGrid'));
+
+  const enablePlayAgain = () => {
+    const btn = document.getElementById('startBtn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.textContent = 'Play Again';
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+    btn.addEventListener('click', startGame);
+  };
+
+  if (CG && CG.ad) {
+    const wasMuted = muted;
+    CG.ad.requestAd('midgame', {
+      adStarted: () => { muted = true; bgMusic.pause(); },
+      adFinished: () => { muted = wasMuted; if (!musicMuted) safePlayMusic(); enablePlayAgain(); },
+      adError: () => { muted = wasMuted; if (!musicMuted) safePlayMusic(); enablePlayAgain(); }
+    });
+  } else {
+    // No SDK available (local testing) — just enable immediately
+    enablePlayAgain();
+  }
+}
+
+function startGame() {
+  ensureAudio();
+  overlay.style.display = 'none';
+  resetGame();
+  gameActive = true;
+  isPaused = false;
+  pauseBtn.disabled = false;
+  pauseBtn.textContent = '⏸️';
+  lastFrameTime = 0;
+  if (CG && CG.game) CG.game.gameplayStart();
+  if (!musicMuted) safePlayMusic();
+  loop();
+}
+
+startBtn.addEventListener('click', startGame);
+
+// ---------- Boot sequence ----------
+// Title screen (menu) is not "gameplay" per CrazyGames' definition, so we call
+// loadingStop() once the menu/title is ready and interactive, not gameplayStart().
+(async function boot() {
+  await sdkInitPromise;
+  best = loadBest();
+  bestEl.textContent = 'Best: ' + best;
+  buildCharGrid(document.getElementById('charGrid'));
+  if (CG && CG.game) CG.game.loadingStop();
+})();
+</script>
+</body>
+</html>
