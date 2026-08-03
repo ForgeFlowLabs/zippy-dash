@@ -229,6 +229,9 @@ bgMusic.volume = 0.35;
 let musicMuted = false;
 let gameActive = false;
 let isPaused = false;
+// CrazyGames' own audio setting (game.settings.muteAudio). Per their SDK docs
+// this MUST override the in-game audio toggles, so it gates all sound below.
+let cgMuteAudio = false;
 bgMusic.load();
 
 // Logical game coordinate space -- all game logic/drawing uses these, unchanged
@@ -299,12 +302,28 @@ async function submitLeaderboardScore(finalScore) {
   }
 }
 
+// Apply CrazyGames' master audio setting; it must override the in-game toggles.
+function applyCgAudioSetting() {
+  try {
+    if (CG && CG.game && CG.game.settings) {
+      cgMuteAudio = !!CG.game.settings.muteAudio;
+      if (cgMuteAudio) bgMusic.pause();
+      else if (gameActive && !isPaused) safePlayMusic();
+    }
+  } catch (e) { /* settings unavailable — leave audio as-is */ }
+}
+
 async function initSDK() {
   if (!CG) return; // running outside CrazyGames (e.g. local file testing) — skip silently
   try {
     if (CG.game) CG.game.loadingStart();
     await CG.init();
     sdkReady = true;
+    // Honor CrazyGames' audio setting now, and react to later changes from the site chrome.
+    applyCgAudioSetting();
+    if (CG.game && CG.game.addSettingsChangeListener) {
+      CG.game.addSettingsChangeListener(applyCgAudioSetting);
+    }
   } catch (e) {
     console.log('CrazyGames SDK init failed', e);
   }
@@ -318,7 +337,7 @@ function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 function beep(freq, duration, type = 'sine', vol = 0.15) {
-  if (muted) return;
+  if (muted || cgMuteAudio) return;
   ensureAudio();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
@@ -346,7 +365,7 @@ function playTone(freq, duration, type, vol, startTime) {
   osc.stop(startTime + duration);
 }
 function sweepTone(freqStart, freqEnd, duration, type, vol) {
-  if (muted) return;
+  if (muted || cgMuteAudio) return;
   ensureAudio();
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
@@ -366,7 +385,7 @@ function sweepTone(freqStart, freqEnd, duration, type, vol) {
 function sfxMove()  { sweepTone(440, 640, 0.09, 'sine', 0.10); }
 // Bright two-note ascending chime for scoring
 function sfxScore() {
-  if (muted) return;
+  if (muted || cgMuteAudio) return;
   ensureAudio();
   const now = audioCtx.currentTime;
   playTone(660, 0.10, 'triangle', 0.08, now);
@@ -378,7 +397,7 @@ function sfxHit()   { sweepTone(320, 110, 0.4, 'triangle', 0.16); }
 function sfxCollect() { sweepTone(700, 1000, 0.12, 'sine', 0.09); }
 // Bright three-note ascending arpeggio for combo level-ups
 function sfxCombo() {
-  if (muted) return;
+  if (muted || cgMuteAudio) return;
   ensureAudio();
   const now = audioCtx.currentTime;
   playTone(523, 0.10, 'triangle', 0.09, now);
@@ -387,6 +406,7 @@ function sfxCombo() {
 }
 
 function safePlayMusic() {
+  if (musicMuted || cgMuteAudio) return; // respect the in-game toggle AND CrazyGames' master mute
   try {
     const p = bgMusic.play();
     if (p && typeof p.catch === 'function') p.catch(() => {});
@@ -1372,10 +1392,24 @@ function finalizeGameOver() {
 
   if (CG && CG.ad) {
     const wasMuted = muted;
+    let adResolved = false;
+    const resolveAd = () => {
+      if (adResolved) return;
+      adResolved = true;
+      muted = wasMuted;
+      if (!musicMuted) safePlayMusic();
+      enablePlayAgain();
+    };
+    // Safety net: during Basic Launch ads are disabled and a midgame request
+    // can be silently ignored (no adFinished/adError). Without this, the
+    // "Play Again" button would stay stuck on "Loading…" forever — exactly the
+    // dead-button / between-levels freeze CrazyGames QA rejects. Always recover.
+    const adFallback = setTimeout(resolveAd, 4000);
     CG.ad.requestAd('midgame', {
+      // Mute only once the ad actually starts (not when requested), per guidelines.
       adStarted: () => { muted = true; bgMusic.pause(); },
-      adFinished: () => { muted = wasMuted; if (!musicMuted) safePlayMusic(); enablePlayAgain(); },
-      adError: () => { muted = wasMuted; if (!musicMuted) safePlayMusic(); enablePlayAgain(); }
+      adFinished: () => { clearTimeout(adFallback); resolveAd(); },
+      adError: () => { clearTimeout(adFallback); resolveAd(); }
     });
   } else {
     // No SDK available (local testing) — just enable immediately

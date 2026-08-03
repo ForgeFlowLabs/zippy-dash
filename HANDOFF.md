@@ -11,8 +11,34 @@ A browser-based endless dodge game built for submission to CrazyGames, developed
 | `cover-landscape.png` | 1920x1080 CrazyGames cover art |
 | `cover-portrait.png` | 800x1200 CrazyGames cover art |
 | `cover-square.png` | 800x800 CrazyGames cover art |
+| `crazygames-docs/` | Full CrazyGames developer documentation (transcribed), used to verify compliance |
 
 **To run locally:** put `index.html` and `bg-music.mp3` in the same folder, open the HTML file in a browser.
+
+## CrazyGames compliance status (audited against `crazygames-docs/`)
+
+Cross-checked against the actual requirement text in `crazygames-docs/`, not just this summary.
+
+**Met in code:**
+- ✅ Entry point is `index.html`; single self-contained file; all asset paths relative (only the SDK is an absolute CrazyGames URL, as intended). Well under file-size/count limits.
+- ✅ Full SDK integration: `init()`, `loadingStart/Stop`, `gameplayStart/Stop`, Data module (best score).
+- ✅ Frame-rate-independent physics (delta-time); mouse + keyboard + touch; AZERTY-safe (`event.code`); no custom fullscreen button.
+- ✅ Portrait layout — allowed, with background on the sides (per technical-requirements). Body stacks vertically so the footer sits below the game.
+- ✅ Ads only via the SDK; midgame ad requested after death; audio muted on `adStarted`, restored on finish. **Graceful when ads are disabled/unfilled/silent** — a 4s fallback always re-enables "Play Again" so there is no dead button / between-levels freeze (a documented rejection reason for Basic Launch).
+- ✅ CrazyGames `game.settings.muteAudio` **overrides** the in-game audio toggles, with a settings-change listener (per SDK docs).
+- ✅ Guests can always play; no external login; no personal data collected (no consent notice needed). PEGI-12-appropriate; English.
+- ✅ Leaderboard code matches their AES-GCM spec, gated behind a placeholder key (safe no-op until a real key is added — invite-only feature).
+
+**Still required at submission (portal / assets — NOT code):**
+- ⏳ **Preview video** — required. 15–20s, no sound, landscape 1080p (16:9) AND portrait 1080p (2:3), ≤50MB, static cover as opening frame, no black bars/cursor/promo text. Not yet produced (needs a screen recording).
+- ⏳ **Metadata:** game description + controls text in the Developer Portal.
+- ⏳ **Progress Save option** must be selected during submission, or the Data module is disabled regardless of code.
+- ⏳ Verify the **"Zippy Dash"** name doesn't collide with an existing CrazyGames title, and confirm cover images have no borders/extra text (title only).
+- ⏳ Real **leaderboard encryption key** if/when invited to that feature.
+
+**Optional / nice-to-have (not blocking):**
+- `game.reportGameCompletedPercentage()` for an endless game (would need a self-defined progress notion, e.g. vs best score).
+- Readability pass in the Portal QA tool at the smallest listed iframe sizes (e.g. 800x450) — the fixed-size overlay/logo can get cramped on very small frames.
 
 ## ✅ The "game breaks / won't play" issue — RESOLVED
 
