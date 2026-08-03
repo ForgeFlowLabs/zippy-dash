@@ -19,9 +19,18 @@ A browser-based endless dodge game built for submission to CrazyGames, developed
 
 Cross-checked against the actual requirement text in `crazygames-docs/`, not just this summary.
 
+**Launch phase — SDK is intentionally OFF for now:**
+The CrazyGames SDK `<script>` tag is **commented out** in `index.html` for the
+testing / **Basic Launch** phase. Per the docs the SDK is *optional* for Basic
+Launch (monetization is disabled then anyway), and loading it off-platform only
+throws benign "not initialized" / "ads disabled on this domain" errors. All SDK
+integration code stays in place and guarded — re-add the one script tag in the
+`<head>` for **Full Launch** (hosted on CrazyGames) and it activates. With the
+SDK off, best score persists via `localStorage`.
+
 **Met in code:**
-- ✅ Entry point is `index.html`; single self-contained file; all asset paths relative (only the SDK is an absolute CrazyGames URL, as intended). Well under file-size/count limits.
-- ✅ Full SDK integration: `init()`, `loadingStart/Stop`, `gameplayStart/Stop`, Data module (best score).
+- ✅ Entry point is `index.html`; single self-contained file; all asset paths relative. Well under file-size/count limits. Runs with **no external requests** in the current (SDK-off) build.
+- ✅ Full SDK integration written and guarded (dormant until the SDK tag is re-added): `init()`, `loadingStart/Stop`, `gameplayStart/Stop`, Data module (best score), all routed through a `cgCall()` wrapper so a call racing ahead of `init()` can never surface an error.
 - ✅ Frame-rate-independent physics (delta-time); mouse + keyboard + touch; AZERTY-safe (`event.code`); no custom fullscreen button.
 - ✅ Portrait layout — allowed, with background on the sides (per technical-requirements). Body stacks vertically so the footer sits below the game.
 - ✅ Ads only via the SDK; midgame ad requested after death; audio muted on `adStarted`, restored on finish. **Graceful when ads are disabled/unfilled/silent** — a 4s fallback always re-enables "Play Again" so there is no dead button / between-levels freeze (a documented rejection reason for Basic Launch).

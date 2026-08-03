@@ -3,8 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <title>Zippy Dash — Flowgames</title>
-<!-- Verify this is the current SDK URL in the CrazyGames Developer Portal before submission -->
-<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+<!--
+  CrazyGames SDK is intentionally NOT loaded during the testing / Basic Launch
+  phase. Per the CrazyGames docs the SDK is OPTIONAL for Basic Launch (and
+  monetization is disabled then anyway). Loading it off the CrazyGames platform
+  (a local file or your own domain) only throws benign "CrazySDK is not
+  initialized yet" / "ads disabled on this domain" errors.
+
+  To enable it for FULL Launch (once hosted on CrazyGames), add this tag back in
+  the <head> (verify the URL is current in the Developer Portal first):
+      sdk.crazygames.com/crazygames-sdk-v3.js
+  All SDK integration below is already written and guarded (via the CG check and
+  cgCall wrapper), so it activates automatically once the SDK is present.
+-->
 <style>
   html, body {
     margin: 0;
@@ -219,7 +230,16 @@
 // console), so failures on the live site or on devices without easy devtools
 // access can still be seen and screenshotted for diagnosis.
 (function installErrorOverlay() {
+  // CrazyGames SDK methods reject/throw with these when the game runs OFF their
+  // platform (a local file or your own domain): ads "disabled on this domain",
+  // "CrazySDK is not initialized yet", etc. They're expected there and never
+  // happen on CrazyGames itself, so don't alarm the player — log for devs only.
+  var BENIGN = /crazy|crazysdk|not initialized|disabled on this domain/i;
   function show(msg) {
+    if (BENIGN.test(String(msg))) {
+      try { console.log('[Zippy Dash] Ignored off-platform SDK notice:', msg); } catch (e) {}
+      return;
+    }
     let el = document.getElementById('errBox');
     if (!el) {
       el = document.createElement('div');
@@ -518,6 +538,11 @@ function loadBest() {
       return parseInt(stored || '0', 10) || 0;
     }
   } catch (e) { /* fall through to local fallback */ }
+  // Without the SDK (testing / Basic Launch), persist across reloads via
+  // localStorage; fall back to an in-memory value only if storage is blocked.
+  try {
+    return parseInt(localStorage.getItem('zippyDashBest') || '0', 10) || 0;
+  } catch (e) { /* storage blocked */ }
   return parseInt(window.__zippyDashBestFallback || '0', 10) || 0;
 }
 function saveBest(val) {
@@ -527,6 +552,10 @@ function saveBest(val) {
       return;
     }
   } catch (e) { /* fall through to local fallback */ }
+  try {
+    localStorage.setItem('zippyDashBest', String(val));
+    return;
+  } catch (e) { /* storage blocked */ }
   window.__zippyDashBestFallback = String(val);
 }
 best = 0; // populated once SDK init resolves (Data module requires init first)
@@ -1444,11 +1473,16 @@ function finalizeGameOver() {
     // "Play Again" button would stay stuck on "Loading…" forever — exactly the
     // dead-button / between-levels freeze CrazyGames QA rejects. Always recover.
     const adFallback = setTimeout(resolveAd, 4000);
-    CG.ad.requestAd('midgame', {
-      // Mute only once the ad actually starts (not when requested), per guidelines.
-      adStarted: () => { muted = true; bgMusic.pause(); },
-      adFinished: () => { clearTimeout(adFallback); resolveAd(); },
-      adError: () => { clearTimeout(adFallback); resolveAd(); }
+    // Wrapped in cgCall so a rejection thrown by requestAd itself (e.g. "ads
+    // disabled on this domain" when running off the CrazyGames platform) can't
+    // surface as an uncaught error; the fallback still recovers the button.
+    cgCall(function () {
+      return CG.ad.requestAd('midgame', {
+        // Mute only once the ad actually starts (not when requested), per guidelines.
+        adStarted: () => { muted = true; bgMusic.pause(); },
+        adFinished: () => { clearTimeout(adFallback); resolveAd(); },
+        adError: () => { clearTimeout(adFallback); resolveAd(); }
+      });
     });
   } else {
     // No SDK available (local testing) — just enable immediately
