@@ -1399,14 +1399,25 @@ function startGame() {
 startBtn.addEventListener('click', startGame);
 
 // ---------- Boot sequence ----------
-// Title screen (menu) is not "gameplay" per CrazyGames' definition, so we call
-// loadingStop() once the menu/title is ready and interactive, not gameplayStart().
-(async function boot() {
-  await sdkInitPromise;
+// Build the interactive title screen IMMEDIATELY — never gate it on the SDK.
+// When the game is opened on a standalone domain (e.g. a plain Vercel URL)
+// rather than inside the CrazyGames player, CG.init() can stall forever waiting
+// on a parent-frame handshake that never arrives; awaiting it here previously
+// left the title screen with no character cards (looked broken / "not running").
+(function boot() {
   best = loadBest();
   bestEl.textContent = 'Best: ' + best;
   buildCharGrid(document.getElementById('charGrid'));
-  if (CG && CG.game) CG.game.loadingStop();
+
+  // Let the SDK finish in the background. Refresh the best score (the Data
+  // module only works after init) and clear the loading state once it resolves,
+  // but never block the UI on it — cap the wait so loadingStop() always fires.
+  const initTimeout = new Promise(res => setTimeout(res, 3000));
+  Promise.race([sdkInitPromise, initTimeout]).then(() => {
+    best = loadBest();
+    bestEl.textContent = 'Best: ' + best;
+    if (CG && CG.game) { try { CG.game.loadingStop(); } catch (e) {} }
+  });
 })();
 </script>
 </body>
