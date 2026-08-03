@@ -6,13 +6,13 @@ A browser-based endless dodge game built for submission to CrazyGames, developed
 
 | File | Purpose |
 |---|---|
-| `zippy-dash.html` | The full game — single HTML file with inline CSS/JS |
+| `index.html` | The full game — single HTML file with inline CSS/JS (named `index.html` so it serves at the site root and satisfies CrazyGames' required entry-point filename) |
 | `bg-music.mp3` | Background music track (128kbps, ~97s loop) — **must sit in the same folder** as the HTML file; referenced via relative path (`<source src="bg-music.mp3">`) |
 | `cover-landscape.png` | 1920x1080 CrazyGames cover art |
 | `cover-portrait.png` | 800x1200 CrazyGames cover art |
 | `cover-square.png` | 800x800 CrazyGames cover art |
 
-**To run locally:** put `zippy-dash.html` and `bg-music.mp3` in the same folder, open the HTML file in a browser.
+**To run locally:** put `index.html` and `bg-music.mp3` in the same folder, open the HTML file in a browser.
 
 ## ⚠️ Current known issue — UNRESOLVED
 
@@ -69,7 +69,7 @@ Despite both fixes, the user reported "it was running here but now it doesn't" m
 
 ## Technical notes for whoever picks this up
 
-- Everything is in **one script block** at the bottom of `zippy-dash.html` — no build step, no bundler, plain JS + Canvas 2D.
+- Everything is in **one script block** at the bottom of `index.html` — no build step, no bundler, plain JS + Canvas 2D.
 - Game logic operates in a **fixed logical coordinate space** (`W=420, H=640`), decoupled from actual on-screen pixel size via `fitCanvasToViewport()` and a DPR-aware backing buffer. Any new drawing code should use `W`/`H`-relative coordinates, not `canvas.width`/`canvas.height` directly.
 - All per-frame motion/timers are **delta-time scaled** (a `dt` parameter flows through `update()`) — do not add new `+= constant` per-frame logic without multiplying by `dt`, or it'll reintroduce frame-rate dependence.
 - `CG` is the CrazyGames SDK reference, `null` when running outside their platform — every SDK call is guarded with `if (CG && CG.xxx)` so the game runs standalone for local testing.
