@@ -1310,6 +1310,16 @@ function draw() {
 let lastFrameTime = 0;
 function loop(timestamp) {
   if (!running) return;
+  // startGame()/togglePause() prime the loop with a bare loop() call, so the
+  // very first invocation has no timestamp. Running update() then would make
+  // elapsedMs (and therefore dt) NaN, and since player.x/player.bob are
+  // delta-scaled, they'd be corrupted to NaN permanently — the character would
+  // render at translate(NaN, NaN) and silently vanish, with no error thrown.
+  // Skip straight to the next real rAF frame, which always supplies a timestamp.
+  if (timestamp === undefined) {
+    animId = requestAnimationFrame(loop);
+    return;
+  }
   if (!lastFrameTime) lastFrameTime = timestamp;
   const elapsedMs = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
