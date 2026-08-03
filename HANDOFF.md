@@ -14,19 +14,20 @@ A browser-based endless dodge game built for submission to CrazyGames, developed
 
 **To run locally:** put `index.html` and `bg-music.mp3` in the same folder, open the HTML file in a browser.
 
-## ⚠️ Current known issue — UNRESOLVED
+## ✅ The "game breaks / won't play" issue — RESOLVED
 
-The user has reported the game breaking / not playing in their actual browser, on at least two occasions after fixes were applied here. Two real bugs were found and fixed via automated headless-browser testing (jsdom):
+The long-standing report of the game "running here but now it doesn't" was a **silent NaN corruption in the render loop**, now fixed.
 
-1. `bgMusic.play().catch()` could throw if `.play()` didn't return a real Promise in some environments — fixed with a `safePlayMusic()` wrapper (search for it in the file).
-2. `ctx.roundRect()` (used in hay-bale/bamboo-log obstacle rendering) is a newer Canvas API not supported in all browsers — throwing there would silently kill the whole `requestAnimationFrame` loop. Replaced with a manual `pathRoundRect()` helper.
+**Root cause:** `startGame()` and `togglePause()` start the loop by calling `loop()` directly (no argument), so on that first frame `timestamp` was `undefined`. That made `elapsedMs`/`dt` `NaN`, and because `player.x` and `player.bob` are delta-time-scaled (`+= … * dt`), they were corrupted to `NaN` **permanently** on frame one. The character then rendered at `ctx.translate(NaN, NaN)` — drawing nothing — so the player was invisible and the game looked dead. Crucially **no error was ever thrown**, which is exactly why the earlier jsdom error-checking passed and no console error could ever be produced.
 
-Despite both fixes, the user reported "it was running here but now it doesn't" most recently. Automated testing (simulating full playthroughs across all 5 characters, 6+ seconds each, with active input) shows **zero errors** — so the remaining issue may be:
-- Environment-specific (a particular browser/device/WebView)
-- Related to testing via a sandboxed preview iframe rather than a real browser tab
-- Something not exercised by the automated tests (e.g., a specific interaction sequence, timing race, or the CrazyGames SDK script tag failing to load and something downstream assuming it succeeded)
+**Fix:** `loop()` now ignores a call with no timestamp and simply schedules the next real `requestAnimationFrame` (which always supplies one). Verified in a real headless Chromium across all 5 characters — player stays finite, death → game-over → "Play Again" all work, zero errors (aside from the CrazyGames SDK script, which only fails to load in a network-restricted sandbox, not on CrazyGames).
 
-**Next step:** get an actual browser console error from the user (screenshot or copy-pasted text) to pinpoint it — that was the last ask before this handoff.
+Earlier fixes that remain in place: `safePlayMusic()` wrapper around `bgMusic.play()`, and the manual `pathRoundRect()` helper replacing the newer `ctx.roundRect()` API.
+
+## Deployment / hosting
+
+- The game entry file is **`index.html`** (renamed from `zippy-dash.html`) so it serves at the site root and satisfies CrazyGames' required entry-point filename.
+- Hosted on Vercel; a real `index.html` at the repo root serves at `/` natively (no `vercel.json` rewrite needed). If the root ever 404s, confirm Vercel is deploying the latest `main` commit.
 
 ## Project history / key decisions
 
