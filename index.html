@@ -214,6 +214,33 @@
 <div id="footer">Zippy Dash · Flowgames</div>
 
 <script>
+// ---------- Visible error reporter ----------
+// Surface any uncaught error / promise rejection ON SCREEN (not just the
+// console), so failures on the live site or on devices without easy devtools
+// access can still be seen and screenshotted for diagnosis.
+(function installErrorOverlay() {
+  function show(msg) {
+    let el = document.getElementById('errBox');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'errBox';
+      el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;' +
+        'background:rgba(140,10,10,0.96);color:#fff;font:12px/1.45 monospace;' +
+        'padding:10px 12px;white-space:pre-wrap;max-height:45vh;overflow:auto;';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    el.textContent = 'Zippy Dash error — please screenshot:\n' + msg;
+  }
+  window.addEventListener('error', function (e) {
+    show((e.message || 'Unknown error') +
+      (e.filename ? '\n' + e.filename + ':' + e.lineno + ':' + e.colno : ''));
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show('Unhandled promise rejection:\n' + ((r && (r.stack || r.message)) || String(r)));
+  });
+})();
+
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const hud = document.getElementById('hud');
