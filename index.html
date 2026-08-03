@@ -295,6 +295,17 @@ let sdkReady = false;
 // ---------- CrazyGames SDK (safe wrapper — works even if SDK fails to load, e.g. local testing) ----------
 const CG = window.CrazyGames && window.CrazyGames.SDK ? window.CrazyGames.SDK : null;
 
+// Safely invoke a CrazyGames SDK method: swallow BOTH synchronous throws and
+// rejected promises. SDK module methods reject with "CrazySDK is not initialized
+// yet" if they run before init() resolves; several of ours aren't awaited, so
+// without this they surface as uncaught errors / unhandled rejections.
+function cgCall(fn) {
+  try {
+    const r = fn();
+    if (r && typeof r.catch === 'function') r.catch(function () {});
+  } catch (e) { /* SDK not ready or method unavailable — non-fatal */ }
+}
+
 // ---------- CrazyGames Leaderboard (invite-only feature) ----------
 // NOTE: The leaderboard feature must first be enabled for this game in the
 // CrazyGames Developer Portal, which will provide a real 32-byte base64
@@ -343,13 +354,14 @@ function applyCgAudioSetting() {
 async function initSDK() {
   if (!CG) return; // running outside CrazyGames (e.g. local file testing) — skip silently
   try {
-    if (CG.game) CG.game.loadingStart();
+    // init() MUST complete before any other SDK module method is called.
     await CG.init();
     sdkReady = true;
+    cgCall(function () { return CG.game && CG.game.loadingStart(); });
     // Honor CrazyGames' audio setting now, and react to later changes from the site chrome.
     applyCgAudioSetting();
     if (CG.game && CG.game.addSettingsChangeListener) {
-      CG.game.addSettingsChangeListener(applyCgAudioSetting);
+      cgCall(function () { return CG.game.addSettingsChangeListener(applyCgAudioSetting); });
     }
   } catch (e) {
     console.log('CrazyGames SDK init failed', e);
@@ -473,7 +485,7 @@ function togglePause() {
   if (isPaused) {
     running = false;
     cancelAnimationFrame(animId);
-    if (CG && CG.game) CG.game.gameplayStop();
+    cgCall(function () { return CG && CG.game && CG.game.gameplayStop(); });
     bgMusic.pause();
     pauseBtn.textContent = '▶️';
     overlay.innerHTML = `
@@ -491,7 +503,7 @@ function togglePause() {
     pauseBtn.textContent = '⏸️';
     running = true;
     lastFrameTime = 0;
-    if (CG && CG.game) CG.game.gameplayStart();
+    cgCall(function () { return CG && CG.game && CG.game.gameplayStart(); });
     if (!musicMuted) safePlayMusic();
     loop();
   }
@@ -1387,7 +1399,7 @@ function finalizeGameOver() {
   pauseBtn.textContent = '⏸️';
   sfxHit();
   cancelAnimationFrame(animId);
-  if (CG && CG.game) CG.game.gameplayStop();
+  cgCall(function () { return CG && CG.game && CG.game.gameplayStop(); });
 
   if (score > best) {
     best = score;
@@ -1453,7 +1465,7 @@ function startGame() {
   pauseBtn.disabled = false;
   pauseBtn.textContent = '⏸️';
   lastFrameTime = 0;
-  if (CG && CG.game) CG.game.gameplayStart();
+  cgCall(function () { return CG && CG.game && CG.game.gameplayStart(); });
   if (!musicMuted) safePlayMusic();
   loop();
 }
@@ -1478,7 +1490,7 @@ startBtn.addEventListener('click', startGame);
   Promise.race([sdkInitPromise, initTimeout]).then(() => {
     best = loadBest();
     bestEl.textContent = 'Best: ' + best;
-    if (CG && CG.game) { try { CG.game.loadingStop(); } catch (e) {} }
+    cgCall(function () { return CG && CG.game && CG.game.loadingStop(); });
   });
 })();
 </script>
