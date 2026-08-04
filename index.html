@@ -174,7 +174,7 @@
   #ctrlRow {
     display: flex;
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 8px;
   }
   .ctrlBtn {
     background: rgba(0,0,0,0.35);
@@ -210,6 +210,13 @@
   }
   /* Compact the title/game-over menu on short frames (e.g. 800x450) so all five
      characters AND the Start button fit without clipping. */
+  /* On phones, drop the footer and slim the controls so the play area fills
+     the screen edge-to-edge. */
+  @media (max-width: 640px) {
+    #footer { display: none; }
+    #ctrlRow { margin-top: 5px; gap: 8px; }
+    .ctrlBtn { padding: 5px 9px; }
+  }
   @media (max-height: 540px) {
     #logo { font-size: clamp(22px, 6.5vmin, 32px); margin-bottom: 0; }
     #brand { font-size: 9px; letter-spacing: 2px; margin-bottom: 6px; }
@@ -304,12 +311,16 @@ bgMusic.load();
 
 // Logical game coordinate space -- all game logic/drawing uses these, unchanged
 // regardless of actual screen size or pixel density.
-// Width is fixed; height ADAPTS to the viewport's shape (computed once at load)
-// so tall phones get a taller play area that fills the screen instead of
-// letterboxing, while desktop/tablet keep the tuned 640. Clamped 640..900.
+// Width is fixed; height ADAPTS to the device's aspect (computed once at load)
+// so the play area matches the screen shape and fills it on ANY device — phones
+// go nearly edge-to-edge, desktop keeps a tuned minimum (portrait games are
+// allowed themed side space). A slim strip is reserved for the control buttons.
 const W = 420;
-const _viewAspect = window.innerHeight / Math.max(window.innerWidth, 1);
-const H = Math.round(Math.min(Math.max(W * _viewAspect, 640), 900));
+// Reserve a small strip below the canvas for the control buttons (kept in sync
+// with the fit math below so the canvas fills everything else).
+const UI_RESERVED = 54;
+const _availH = Math.max(window.innerHeight - UI_RESERVED, 1);
+const H = Math.round(Math.min(Math.max(W * (_availH / Math.max(window.innerWidth, 1)), 640), 1100));
 const LANES = 4;
 const laneWidth = W / LANES;
 
@@ -319,16 +330,13 @@ canvas.width = W * dpr;
 canvas.height = H * dpr;
 ctx.scale(dpr, dpr);
 
-// Responsive display sizing -- fits the canvas into whatever viewport/iframe
-// CrazyGames gives it (required: readable across their listed iframe sizes),
-// while keeping the game's aspect ratio intact.
+// Fill the viewport as fully as possible while preserving the play-area aspect.
+// Because H is derived from the same available area, the canvas fills the whole
+// width on tall devices and the whole height on wide ones — no wasted space.
 function fitCanvasToViewport() {
-  // Space for control buttons + footer below the canvas. Scale it down on short
-  // viewports so the game gets more height on small iframes (e.g. 800x450).
-  const reservedHeight = Math.max(64, Math.min(100, window.innerHeight * 0.14));
-  const maxW = window.innerWidth * 0.94;
-  const maxH = (window.innerHeight - reservedHeight) * 0.94;
-  const scale = Math.max(Math.min(maxW / W, maxH / H, 1.5), 0.35);
+  const maxW = window.innerWidth - 10;                 // leave room for the 4px border
+  const maxH = window.innerHeight - UI_RESERVED;
+  const scale = Math.max(Math.min(maxW / W, maxH / H, 2.4), 0.3);
   canvas.style.width = Math.round(W * scale) + 'px';
   canvas.style.height = Math.round(H * scale) + 'px';
 }
