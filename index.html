@@ -304,7 +304,12 @@ bgMusic.load();
 
 // Logical game coordinate space -- all game logic/drawing uses these, unchanged
 // regardless of actual screen size or pixel density.
-const W = 420, H = 640;
+// Width is fixed; height ADAPTS to the viewport's shape (computed once at load)
+// so tall phones get a taller play area that fills the screen instead of
+// letterboxing, while desktop/tablet keep the tuned 640. Clamped 640..900.
+const W = 420;
+const _viewAspect = window.innerHeight / Math.max(window.innerWidth, 1);
+const H = Math.round(Math.min(Math.max(W * _viewAspect, 640), 900));
 const LANES = 4;
 const laneWidth = W / LANES;
 
