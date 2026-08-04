@@ -337,6 +337,9 @@ let sdkReady = false;
 // Advances with speed each frame — drives the forward-motion feel (scrolling
 // lane markers, road chevrons, speed lines) without affecting gameplay logic.
 let scrollY = 0;
+// Power-ups, magnet effect, evolving stage, and in-game onboarding hint timer.
+let powerups = [], powerupTimer = 0, magnetTimer = 0;
+let stage = 1, hintTimer = 0;
 
 // ---------- CrazyGames SDK (safe wrapper — works even if SDK fails to load, e.g. local testing) ----------
 const CG = window.CrazyGames && window.CrazyGames.SDK ? window.CrazyGames.SDK : null;
@@ -602,12 +605,18 @@ function resetGame() {
     w: 42,
     h: 52,
     targetX: laneWidth * 1 + laneWidth / 2,
-    bob: 0
+    bob: 0,
+    shield: false
   };
   obstacles = [];
   items = [];
   itemSpawnTimer = 0;
   particles = [];
+  powerups = [];
+  powerupTimer = 0;
+  magnetTimer = 0;
+  stage = 1;
+  hintTimer = 165; // ~2.7s of in-game onboarding hints (auto-dismiss on first move)
   score = 0;
   speed = 4.2;
   spawnTimer = 0;
@@ -616,28 +625,66 @@ function resetGame() {
   hud.textContent = '0';
 }
 
+// --- lane availability helpers (keep collectibles reachable, not trapped) ---
+function laneHasObstacleNear(lane, top, bottom) {
+  for (let o of obstacles) if (o.lane === lane && o.y > top && o.y < bottom) return true;
+  return false;
+}
+function laneHasPickupNear(lane, top, bottom) {
+  for (let it of items) if (it.lane === lane && it.y > top && it.y < bottom) return true;
+  for (let pu of powerups) if (pu.lane === lane && pu.y > top && pu.y < bottom) return true;
+  return false;
+}
+function lanesClearOfObstacles(top, bottom) {
+  const out = [];
+  for (let l = 0; l < LANES; l++) if (!laneHasObstacleNear(l, top, bottom)) out.push(l);
+  return out;
+}
+
 function spawnObstacle() {
-  const lane = Math.floor(Math.random() * LANES);
-  obstacles.push({
-    lane,
-    x: laneWidth * lane + laneWidth / 2,
-    y: -50,
-    w: 44,
-    h: 44,
-    rot: 0
-  });
+  // Don't drop a rock onto a collectible that's near the top — that's exactly
+  // what made pickups impossible to grab (rock and treat sharing a lane).
+  let lanes = [];
+  for (let l = 0; l < LANES; l++) if (!laneHasPickupNear(l, -180, 150)) lanes.push(l);
+  if (!lanes.length) lanes = [0, 1, 2, 3];
+  const lane = lanes[Math.floor(Math.random() * lanes.length)];
+  obstacles.push({ lane, x: laneWidth * lane + laneWidth / 2, y: -50, w: 44, h: 44, rot: 0 });
 }
 
 function spawnItem() {
-  const lane = Math.floor(Math.random() * LANES);
-  items.push({
-    lane,
-    x: laneWidth * lane + laneWidth / 2,
-    y: -40,
-    w: 30,
-    h: 30,
-    rot: 0
-  });
+  // Spawn only in a lane with no obstacle near the top, so there's a clear path
+  // to dip in, grab it, and get out.
+  const lanes = lanesClearOfObstacles(-220, 170);
+  if (!lanes.length) return; // no safe lane this cycle — try again next time
+  const lane = lanes[Math.floor(Math.random() * lanes.length)];
+  items.push({ lane, x: laneWidth * lane + laneWidth / 2, y: -40, w: 30, h: 30, rot: 0 });
+}
+
+function spawnPowerup() {
+  const lanes = lanesClearOfObstacles(-220, 170);
+  if (!lanes.length) return;
+  const lane = lanes[Math.floor(Math.random() * lanes.length)];
+  const type = Math.random() < 0.5 ? 'shield' : 'magnet';
+  powerups.push({ lane, x: laneWidth * lane + laneWidth / 2, y: -46, w: 34, h: 34, rot: 0, type });
+}
+
+function activatePowerup(pu) {
+  sfxCombo();
+  spawnParticles(pu.x, pu.y, pu.type === 'shield' ? '#38bdf8' : '#f59e0b', 16, 1.6, 34);
+  if (pu.type === 'shield') {
+    player.shield = true;
+    comboPopups.push({ x: player.x, y: player.y - 46, life: 60, text: 'SHIELD!' });
+  } else {
+    magnetTimer = 360; // ~6s
+    comboPopups.push({ x: player.x, y: player.y - 46, life: 60, text: 'MAGNET!' });
+  }
+}
+
+// Magnet: draw loose pickups toward the player while active.
+function pullToward(obj, dt) {
+  const dx = player.x - obj.x, dy = player.y - obj.y;
+  const d = Math.hypot(dx, dy) || 1;
+  if (d < 230) { obj.x += (dx / d) * 4.5 * dt; obj.y += (dy / d) * 2.2 * dt; }
 }
 
 function movePlayerTo(lane) {
@@ -645,6 +692,7 @@ function movePlayerTo(lane) {
   if (lane !== player.lane) sfxMove();
   player.lane = lane;
   player.targetX = laneWidth * lane + laneWidth / 2;
+  if (hintTimer > 22) hintTimer = 22; // player gets it — fade the hint quickly
 }
 
 document.addEventListener('keydown', (e) => {
@@ -735,6 +783,8 @@ function update(dt) {
   player.bob += 0.25 * dt;
   scrollY += speed * dt; // world scroll — powers the motion effects in draw()
 
+  if (hintTimer > 0) hintTimer -= dt; // onboarding hint fades over time
+
   spawnTimer += dt;
   const spawnRate = Math.max(26, 55 - Math.floor(score / 4));
   if (spawnTimer > spawnRate) {
@@ -747,35 +797,59 @@ function update(dt) {
     o.rot += 0.05 * dt;
   }
 
-  for (let o of obstacles) {
-    if (o.lane === player.lane) {
-      const overlapY = o.y + o.h > player.y - player.h / 2 && o.y < player.y + player.h / 2;
-      if (overlapY) return triggerDeathSequence();
-    }
-  }
+  const pTop = player.y - player.h / 2;
+  const pBot = player.y + player.h / 2;
 
-  // Collectible items -- themed to the selected character's world, bonus
-  // points on top of the survival/combo score, no penalty for missing them.
-  itemSpawnTimer += dt;
-  if (itemSpawnTimer > 110) {
-    spawnItem();
-    itemSpawnTimer = 0;
-  }
-  for (let it of items) {
-    it.y += speed * dt;
-    it.rot += 0.04 * dt;
-  }
-  items = items.filter(it => {
-    if (it.lane === player.lane) {
-      const overlapY = it.y + it.h > player.y - player.h / 2 && it.y < player.y + player.h / 2;
-      if (overlapY) {
-        collectItem(it);
-        return false;
+  // Collisions (shield absorbs one hit) + near-miss bonus for genuine dodges.
+  for (let o of obstacles) {
+    const overlapY = o.y + o.h > pTop && o.y < pBot;
+    if (o.lane === player.lane) {
+      if (o.y + o.h > pTop - 55 && o.y < pTop) o.threat = true; // looming in your lane
+      if (overlapY && !o.hit) {
+        if (player.shield) {
+          player.shield = false;
+          o.hit = true;
+          shakeIntensity = 9; flashAlpha = 0.35;
+          spawnParticles(o.x, o.y, '#38bdf8', 18, 2, 40);
+          sfxHit();
+          comboPopups.push({ x: player.x, y: player.y - 46, life: 46, text: 'BLOCKED!' });
+        } else {
+          return triggerDeathSequence();
+        }
       }
+    } else if (o.threat && !o.nearMissed && o.y > pBot) {
+      // it bore down in your lane and you slipped out just in time
+      o.nearMissed = true;
+      score += 3; hud.textContent = String(score);
+      comboPopups.push({ x: player.x, y: player.y - 40, life: 40, text: 'NICE +3' });
+      spawnParticles(player.x, player.y - 10, '#a7f3d0', 8, 1.2, 24);
+      sfxCollect();
     }
+  }
+  obstacles = obstacles.filter(o => !o.hit); // shield-blocked ones removed, not "passed"
+
+  // ----- collectibles + power-ups (reachability-aware spawns) -----
+  itemSpawnTimer += dt;
+  if (itemSpawnTimer > 110) { spawnItem(); itemSpawnTimer = 0; }
+  powerupTimer += dt;
+  if (powerupTimer > 720) { spawnPowerup(); powerupTimer = 0; }
+
+  const magnetOn = magnetTimer > 0;
+  for (let it of items) { it.y += speed * dt; it.rot += 0.04 * dt; if (magnetOn) pullToward(it, dt); }
+  for (let pu of powerups) { pu.y += speed * dt; pu.rot += 0.05 * dt; if (magnetOn) pullToward(pu, dt); }
+
+  // Collect by proximity (works for lane-aligned pickups and magnet-pulled ones).
+  items = items.filter(it => {
+    if (it.y + it.h > pTop && it.y < pBot && Math.abs(it.x - player.x) < 26) { collectItem(it); return false; }
     return it.y < H + 60;
   });
+  powerups = powerups.filter(pu => {
+    if (pu.y + pu.h > pTop && pu.y < pBot && Math.abs(pu.x - player.x) < 30) { activatePowerup(pu); return false; }
+    return pu.y < H + 60;
+  });
+  if (magnetTimer > 0) magnetTimer -= dt;
 
+  // ----- survival scoring (obstacles cleared off the bottom) -----
   const before = obstacles.length;
   obstacles = obstacles.filter(o => o.y < H + 60);
   const passed = before - obstacles.length;
@@ -799,6 +873,15 @@ function update(dt) {
       triggerComboPopup(comboMultiplier);
       sfxCombo();
     }
+  }
+
+  // ----- evolving stages: the world darkens/intensifies as you progress -----
+  const newStage = Math.min(1 + Math.floor(score / 60), 6);
+  if (newStage > stage) {
+    stage = newStage;
+    comboPopups.push({ x: W / 2, y: H * 0.42, life: 78, text: 'STAGE ' + stage });
+    sfxCombo();
+    cgCall(function () { return CG && CG.game && CG.game.happytime && CG.game.happytime(); });
   }
 
   comboPopups.forEach(p => { p.y -= 1.2 * dt; p.life -= dt; });
@@ -1419,6 +1502,67 @@ function drawVignette(c) {
   c.fillRect(0, 0, W, H);
 }
 
+// Evolving world: a dusk→night tint that deepens with the stage, plus stars.
+function drawStageOverlay(c) {
+  const tint = Math.min((stage - 1) * 0.055, 0.30);
+  if (tint > 0.01) {
+    c.fillStyle = 'rgba(10,12,40,' + tint.toFixed(3) + ')';
+    c.fillRect(0, 0, W, H);
+  }
+  if (stage >= 3) {
+    for (let i = 0; i < 20; i++) {
+      const sx = (i * 71 + 18) % W;
+      const sy = (i * 127 + scrollY * 0.25) % (H * 0.62);
+      const r = 0.6 + ((i % 3) * 0.5);
+      c.globalAlpha = 0.35 + 0.35 * ((i % 4) / 3);
+      c.fillStyle = '#ffffff';
+      c.beginPath(); c.arc(sx, sy, r, 0, Math.PI * 2); c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+}
+
+// Power-up token: glowing disc with a clear letter (S = shield, M = magnet).
+function drawPowerup(c, x, y, size, rot, type) {
+  c.save();
+  c.translate(x, y);
+  const r = size / 2;
+  const col = type === 'shield' ? '#38bdf8' : '#f59e0b';
+  c.shadowColor = col; c.shadowBlur = 12;
+  c.fillStyle = col;
+  c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  c.strokeStyle = 'rgba(255,255,255,0.95)'; c.lineWidth = 2.5; c.stroke();
+  c.fillStyle = '#ffffff';
+  c.font = '900 ' + Math.round(size * 0.62) + 'px Arial';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(type === 'shield' ? 'S' : 'M', 0, 1);
+  c.restore();
+}
+
+// In-gameplay onboarding: visual, minimal text, auto-dismisses on first move.
+function drawHints(c) {
+  if (hintTimer <= 0 || dying) return;
+  const a = Math.min(1, hintTimer / 45);
+  c.save();
+  c.textAlign = 'center';
+  c.globalAlpha = a * 0.9;
+  c.fillStyle = '#ffffff';
+  c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 3;
+  c.font = '900 22px Arial';
+  c.strokeText('DODGE!', W / 2, H * 0.30);
+  c.fillText('DODGE!', W / 2, H * 0.30);
+  c.font = '700 13px Arial';
+  c.strokeText('grab the treats · ← → / A D / tap', W / 2, H * 0.30 + 22);
+  c.fillText('grab the treats · ← → / A D / tap', W / 2, H * 0.30 + 22);
+  // arrows flanking the player
+  c.globalAlpha = a * 0.55;
+  c.font = '900 40px Arial';
+  c.fillText('‹', player.x - 48, player.y + 14);
+  c.fillText('›', player.x + 48, player.y + 14);
+  c.restore();
+}
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
@@ -1429,6 +1573,7 @@ function draw() {
 
   // themed background scene for the selected character
   drawScene(ctx, CHARACTERS[selectedCharIndex].species, W, H);
+  drawStageOverlay(ctx);
   drawSpeedLines(ctx, speed);
   drawRoad(ctx);
 
@@ -1438,6 +1583,10 @@ function draw() {
 
   for (let it of items) {
     drawItem(ctx, it.x, it.y, it.w, it.rot, CHARACTERS[selectedCharIndex].species);
+  }
+
+  for (let pu of powerups) {
+    drawPowerup(ctx, pu.x, pu.y, pu.w, pu.rot, pu.type);
   }
 
   for (let p of particles) {
@@ -1467,8 +1616,32 @@ function draw() {
     // Lean into the direction of travel for a livelier feel.
     const lean = Math.max(-16, Math.min(16, (player.targetX - player.x) * 0.6));
     drawCharacter(ctx, player.x, player.y, player.bob, CHARACTERS[selectedCharIndex], lean);
+
+    const py = player.y + Math.sin(player.bob) * 3;
+    // Magnet aura (dashed gold ring) while active.
+    if (magnetTimer > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245,158,11,0.8)';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 6]);
+      ctx.lineDashOffset = -scrollY;
+      ctx.beginPath(); ctx.arc(player.x, py, 40, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    // Shield bubble while active.
+    if (player.shield) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(56,189,248,0.85)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(player.x, py, 34, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = 'rgba(56,189,248,0.13)';
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
+  drawHints(ctx);
   drawVignette(ctx);
   ctx.restore();
 

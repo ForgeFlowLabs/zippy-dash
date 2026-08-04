@@ -80,7 +80,12 @@ Earlier fixes that remain in place: `safePlayMusic()` wrapper around `bgMusic.pl
 - [x] Core dodge gameplay (4-lane endless runner, tap/keyboard controls)
 - [x] 5 selectable animal characters with distinct themed worlds
 - [x] Combo/streak scoring system (multiplier grows every 10 dodges, capped at x5, with popup + sound on level-up)
-- [x] Collectible items per character (bonus points, no penalty for missing)
+- [x] Collectible items per character — **spawn only in lanes clear of obstacles** so they're always reachable (obstacles also avoid dropping onto a fresh pickup)
+- [x] **Near-miss bonus** (+3) when you slip out of a lane an obstacle was bearing down in — rewards skilful dodging
+- [x] **Power-ups:** Shield (absorbs one hit, shows a bubble) and Magnet (~6s, vacuums nearby treats/power-ups), spawned in clear lanes
+- [x] **Evolving stages** every 60 pts (to stage 6): dusk→night tint + stars, "STAGE N" banner, `happytime()` confetti
+- [x] **In-gameplay onboarding**: visual "DODGE!" hint + control arrows that auto-dismiss on the first move (per quality guidelines)
+- [x] **Game feel:** scrolling lane markers/chevrons, speed lines that ramp with velocity, player lean into turns, edge vignette
 - [x] Dramatic death sequence: screen shake, red flash, particle explosion, Mario-style pop/spin/fall animation, ~2 second beat before game-over screen
 - [x] Background music (embedded via relative-path MP3) + sound effects, with mute toggles for both, separate from each other
 - [x] Pause/resume (pauses actual game loop, not just audio)
