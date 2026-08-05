@@ -49,30 +49,31 @@
   }
   #hud {
     position: absolute;
-    top: 18px;
-    left: 22px;
-    color: #422006;
-    font-size: 20px;
+    top: 16px;
+    left: 20px;
+    color: #ffffff;
+    font-size: 22px;
     font-weight: 900;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.55);
   }
   #best {
     position: absolute;
-    top: 18px;
-    right: 22px;
-    color: #78350f;
-    font-size: 14px;
-    font-weight: bold;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.4);
+    top: 20px;
+    right: 20px;
+    color: rgba(255,255,255,0.82);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.55);
   }
   #combo {
     position: absolute;
     top: 44px;
-    left: 22px;
-    color: #dc2626;
-    font-size: 14px;
+    left: 20px;
+    color: #fde047;
+    font-size: 13px;
     font-weight: 900;
-    text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.55);
     transition: transform 0.15s;
   }
   #overlay {
@@ -1527,12 +1528,12 @@ function drawObstacle(c, x, y, size, rot, species) {
 
 // Faint vertical streaks that intensify with speed — sells the sense of velocity.
 function drawSpeedLines(c, sp) {
-  const intensity = Math.max(0, Math.min((sp - 6) / 12, 1));
+  const intensity = Math.max(0, Math.min((sp - 7.5) / 13, 1));
   if (intensity <= 0.02) return;
   c.save();
-  c.strokeStyle = 'rgba(255,255,255,' + (0.10 * intensity).toFixed(3) + ')';
+  c.strokeStyle = 'rgba(255,255,255,' + (0.055 * intensity).toFixed(3) + ')';
   c.lineWidth = 2;
-  const n = 8;
+  const n = 5;
   for (let i = 0; i < n; i++) {
     const x = (i * 89 + 24) % W;
     const len = 36 + intensity * 90;
@@ -1546,12 +1547,13 @@ function drawSpeedLines(c, sp) {
   c.restore();
 }
 
-// Animated road: scrolling lane dividers + centre chevrons rushing toward the player.
+// Animated road: subtle scrolling lane dividers (dashes march toward the player
+// to convey forward motion) — kept minimal so it never distracts from dodging.
 function drawRoad(c) {
-  c.strokeStyle = 'rgba(255,255,255,0.30)';
+  c.strokeStyle = 'rgba(255,255,255,0.22)';
   c.lineWidth = 2;
-  c.setLineDash([10, 10]);
-  c.lineDashOffset = -(scrollY % 20); // dashes march downward = forward motion
+  c.setLineDash([10, 12]);
+  c.lineDashOffset = -(scrollY % 22);
   for (let i = 1; i < LANES; i++) {
     c.beginPath();
     c.moveTo(laneWidth * i, 0);
@@ -1560,21 +1562,6 @@ function drawRoad(c) {
   }
   c.setLineDash([]);
   c.lineDashOffset = 0;
-
-  // subtle chevrons down each lane centre, scrolling with the world
-  c.strokeStyle = 'rgba(255,255,255,0.10)';
-  c.lineWidth = 3;
-  const gap = 90, chev = 12;
-  for (let lane = 0; lane < LANES; lane++) {
-    const cx = laneWidth * lane + laneWidth / 2;
-    for (let y = (scrollY % gap) - gap; y < H; y += gap) {
-      c.beginPath();
-      c.moveTo(cx - chev, y);
-      c.lineTo(cx, y + chev);
-      c.lineTo(cx + chev, y);
-      c.stroke();
-    }
-  }
 }
 
 // Soft edge darkening for depth and focus.
@@ -1728,6 +1715,14 @@ function draw() {
   drawHints(ctx);
   drawVignette(ctx);
   ctx.restore();
+
+  // Slim top scrim (screen-fixed) so the score / best HUD always reads cleanly
+  // over any scene, and the top edge looks tidy.
+  const scrim = ctx.createLinearGradient(0, 0, 0, 74);
+  scrim.addColorStop(0, 'rgba(0,0,0,0.30)');
+  scrim.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = scrim;
+  ctx.fillRect(0, 0, W, 74);
 
   if (flashAlpha > 0.01) {
     ctx.fillStyle = `rgba(255,60,60,${flashAlpha})`;
