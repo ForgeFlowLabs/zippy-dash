@@ -353,6 +353,9 @@ let scrollY = 0;
 // Power-ups, magnet effect, evolving stage, and in-game onboarding hint timer.
 let powerups = [], powerupTimer = 0, magnetTimer = 0;
 let stage = 1, hintTimer = 0;
+// Difficulty is driven by elapsed TIME (not score, which treats/near-misses
+// inflate), so momentum builds smoothly. lastWasWall prevents back-to-back walls.
+let elapsed = 0, lastWasWall = false;
 
 // ---------- CrazyGames SDK (safe wrapper — works even if SDK fails to load, e.g. local testing) ----------
 const CG = window.CrazyGames && window.CrazyGames.SDK ? window.CrazyGames.SDK : null;
@@ -631,9 +634,11 @@ function resetGame() {
   stage = 1;
   hintTimer = 165; // ~2.7s of in-game onboarding hints (auto-dismiss on first move)
   score = 0;
-  speed = 4.2;
+  speed = 3.8;
   spawnTimer = 0;
   scrollY = 0;
+  elapsed = 0;
+  lastWasWall = false;
   running = true;
   hud.textContent = '0';
 }
@@ -662,6 +667,23 @@ function spawnObstacle() {
   if (!lanes.length) lanes = [0, 1, 2, 3];
   const lane = lanes[Math.floor(Math.random() * lanes.length)];
   obstacles.push({ lane, x: laneWidth * lane + laneWidth / 2, y: -50, w: 44, h: 44, rot: 0 });
+}
+
+// A "wall" of obstacles with a reachable gap to thread. Always leaves at least
+// one gap, and the gap lane is chosen clear of any obstacle below so the path
+// through is never blocked — keeping every wall fair.
+function spawnWall(tSec) {
+  const gapCount = tSec < 45 ? 2 : 1; // easier (2 gaps) early, tighter (1) later
+  const clear = lanesClearOfObstacles(-40, H);
+  const pool = clear.length >= gapCount ? clear.slice() : [0, 1, 2, 3];
+  const gaps = [];
+  while (gaps.length < gapCount && pool.length) {
+    gaps.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  for (let l = 0; l < LANES; l++) {
+    if (gaps.indexOf(l) !== -1) continue;
+    obstacles.push({ lane: l, x: laneWidth * l + laneWidth / 2, y: -50, w: 44, h: 44, rot: 0 });
+  }
 }
 
 function spawnItem() {
@@ -798,11 +820,24 @@ function update(dt) {
 
   if (hintTimer > 0) hintTimer -= dt; // onboarding hint fades over time
 
+  // ----- difficulty director: gentle, TIME-based momentum + gap-wall formations -----
+  elapsed += dt;
+  const tSec = elapsed / 60;
+  speed = Math.min(10.5, 3.8 + tSec * 0.06);        // smooth, capped acceleration
+  const spawnRate = Math.max(30, 58 - tSec * 0.34); // obstacles densify slowly over time
+
   spawnTimer += dt;
-  const spawnRate = Math.max(26, 55 - Math.floor(score / 4));
   if (spawnTimer > spawnRate) {
-    spawnObstacle();
     spawnTimer = 0;
+    const wallChance = Math.min(0.12 + tSec * 0.004, 0.38);
+    if (!lastWasWall && tSec > 8 && Math.random() < wallChance) {
+      spawnWall(tSec);
+      lastWasWall = true;
+      spawnTimer = -46; // extra spacing so the wall's gap is always reachable
+    } else {
+      spawnObstacle();
+      lastWasWall = false;
+    }
   }
 
   for (let o of obstacles) {
@@ -878,7 +913,6 @@ function update(dt) {
     if (comboMultiplier > 1) {
       comboEl.textContent = 'x' + comboMultiplier.toFixed(1).replace('.0', '') + ' combo';
     }
-    speed = 4.2 + score * 0.07;
     sfxScore();
     spawnParticles(player.x, player.y, '#facc15');
 

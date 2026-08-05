@@ -78,6 +78,8 @@ Earlier fixes that remain in place: `safePlayMusic()` wrapper around `bgMusic.pl
 ## Feature checklist (implemented)
 
 - [x] Core dodge gameplay (4-lane endless runner, tap/keyboard controls)
+- [x] **Time-based difficulty** — speed ramps smoothly (3.8→10.5 over ~2 min) and is decoupled from score, so grabbing treats no longer spikes the pace
+- [x] **Obstacle formations** — gap-walls you thread (2 gaps early → 1 gap later), always spaced and always leaving a reachable gap (verified: never all-4-lanes-blocked over 150s / 45 walls)
 - [x] 5 selectable animal characters with distinct themed worlds
 - [x] Combo/streak scoring system (multiplier grows every 10 dodges, capped at x5, with popup + sound on level-up)
 - [x] Collectible items per character — **spawn only in lanes clear of obstacles** so they're always reachable (obstacles also avoid dropping onto a fresh pickup)
