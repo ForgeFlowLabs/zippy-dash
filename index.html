@@ -319,20 +319,28 @@ const W = 420;
 // Reserve a small strip below the canvas for the control buttons (kept in sync
 // with the fit math below so the canvas fills everything else).
 const UI_RESERVED = 54;
-const _availH = Math.max(window.innerHeight - UI_RESERVED, 1);
-const H = Math.round(Math.min(Math.max(W * (_availH / Math.max(window.innerWidth, 1)), 640), 1100));
 const LANES = 4;
 const laneWidth = W / LANES;
-
-// High-DPI backing buffer so the game stays crisp on retina/high-density screens
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
-canvas.width = W * dpr;
-canvas.height = H * dpr;
-ctx.scale(dpr, dpr);
+
+// Play-area height ADAPTS to the device's current aspect so it fills the screen
+// in portrait and stays a sensible centered field in landscape. `let` (not
+// const) so it can be recomputed on rotation while not mid-run.
+function computeH() {
+  const availH = Math.max(window.innerHeight - UI_RESERVED, 1);
+  return Math.round(Math.min(Math.max(W * (availH / Math.max(window.innerWidth, 1)), 640), 1100));
+}
+let H = computeH();
+
+// High-DPI backing buffer so the game stays crisp on retina/high-density screens.
+function applyCanvasBuffer() {
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+applyCanvasBuffer();
 
 // Fill the viewport as fully as possible while preserving the play-area aspect.
-// Because H is derived from the same available area, the canvas fills the whole
-// width on tall devices and the whole height on wide ones — no wasted space.
 function fitCanvasToViewport() {
   const maxW = window.innerWidth - 10;                 // leave room for the 4px border
   const maxH = window.innerHeight - UI_RESERVED;
@@ -340,8 +348,36 @@ function fitCanvasToViewport() {
   canvas.style.width = Math.round(W * scale) + 'px';
   canvas.style.height = Math.round(H * scale) + 'px';
 }
-window.addEventListener('resize', fitCanvasToViewport);
+
+// On resize/rotation: if not mid-run, re-derive the play area to match the new
+// orientation (safe — the next game uses the fresh H); during a run just refit
+// the display so we never disrupt live gameplay geometry.
+function onViewportChange() {
+  if (!gameActive) {
+    const newH = computeH();
+    if (newH !== H) { H = newH; applyCanvasBuffer(); }
+  }
+  fitCanvasToViewport();
+}
+window.addEventListener('resize', onViewportChange);
+window.addEventListener('orientationchange', onViewportChange);
 fitCanvasToViewport();
+
+// Themed full-bleed page background so the space around the portrait play area
+// (landscape / desktop / rotated phones) reads as an intentional backdrop that
+// matches the selected character's world, not empty dark space.
+function applyThemeBackground(species) {
+  const theme = getTheme(species);
+  const stops = theme.sky.map(function (s) { return s[1] + ' ' + s[0] + '%'; }).join(', ');
+  const bg = 'linear-gradient(rgba(6,8,24,0.42), rgba(6,8,24,0.66)), ' +
+             'linear-gradient(180deg, ' + stops + ')';
+  // Set on BOTH the root and body: the root element's background is what fills
+  // the viewport, so body-only wouldn't recolor the side space on desktop.
+  document.documentElement.style.background = bg;
+  document.documentElement.style.backgroundAttachment = 'fixed';
+  document.body.style.background = bg;
+  document.body.style.backgroundAttachment = 'fixed';
+}
 
 let player, obstacles, items, itemSpawnTimer, particles, score, best, speed, running, spawnTimer, animId, muted = false;
 let dying = false, deathTimer = 0, shakeIntensity = 0, flashAlpha = 0;
@@ -1147,6 +1183,7 @@ function buildCharGrid(container) {
     card.appendChild(label);
     card.addEventListener('click', () => {
       selectedCharIndex = idx;
+      applyThemeBackground(char.species);
       sweepTone(700, 900, 0.07, 'sine', 0.09);
       container.querySelectorAll('.charCard').forEach(el => el.classList.remove('selected'));
       card.classList.add('selected');
@@ -1794,6 +1831,7 @@ function finalizeGameOver() {
 
 function startGame() {
   ensureAudio();
+  applyThemeBackground(CHARACTERS[selectedCharIndex].species);
   overlay.style.display = 'none';
   resetGame();
   gameActive = true;
@@ -1817,6 +1855,7 @@ startBtn.addEventListener('click', startGame);
 (function boot() {
   best = loadBest();
   bestEl.textContent = 'Best: ' + best;
+  applyThemeBackground(CHARACTERS[selectedCharIndex].species);
   buildCharGrid(document.getElementById('charGrid'));
 
   // Let the SDK finish in the background. Refresh the best score (the Data
